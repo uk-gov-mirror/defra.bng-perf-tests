@@ -27,12 +27,42 @@ SERVICE_ENDPOINT=${SERVICE_ENDPOINT:-service-name.${ENVIRONMENT}.cdp-int.defra.c
 SERVICE_PORT=${SERVICE_PORT:-443}
 SERVICE_URL_SCHEME=${SERVICE_URL_SCHEME:-https}
 
+# Optional per-scenario tuning, forwarded from env vars into JMeter properties.
+# Kept out of the committed .jmx so a secret BEARER_TOKEN never lands in git, and
+# so each run can size its own load. Each is forwarded only when set; otherwise
+# the .jmx property defaults apply. Used by the project-list-payload scenario
+# (BMD-933); a harmless no-op for scenarios that ignore these properties.
+add_prop() {
+  # $1 = JMeter property name, $2 = value. Skips empty values so the .jmx default
+  # wins rather than being overridden with an empty string.
+  if [ -n "$2" ]; then
+    SCENARIO_PROPS="${SCENARIO_PROPS} -J$1=$2"
+  fi
+}
+
+# Assemble and run with xtrace OFF so `set -x` never echoes BEARER_TOKEN into the
+# CDP logs. JWTs and the numeric tunables contain no whitespace, so leaving
+# ${SCENARIO_PROPS} unquoted to word-split into separate args is safe.
+set +x
+SCENARIO_PROPS=""
+add_prop bearerToken "${BEARER_TOKEN}"
+add_prop userId "${USER_ID}"
+add_prop threads "${LIST_THREADS}"
+add_prop rampSeconds "${LIST_RAMP_SECONDS}"
+add_prop loops "${LIST_LOOPS}"
+add_prop listSizeLimitBytes "${LIST_SIZE_LIMIT_BYTES}"
+add_prop listMaxLatencyMs "${LIST_MAX_LATENCY_MS}"
+add_prop limit "${LIST_LIMIT}"
+add_prop offset "${LIST_OFFSET}"
+
 # Run the test suite
 jmeter -n -t ${SCENARIOFILE} -e -l "${REPORTFILE}" -o ${JM_REPORTS} -j ${LOGFILE} -f \
 -Jenv="${ENVIRONMENT}" \
 -Jdomain="${SERVICE_ENDPOINT}" \
 -Jport="${SERVICE_PORT}" \
--Jprotocol="${SERVICE_URL_SCHEME}"
+-Jprotocol="${SERVICE_URL_SCHEME}" \
+${SCENARIO_PROPS}
+set -x
 
 # Publish the results into S3 so they can be displayed in the CDP Portal
 if [ -n "$RESULTS_OUTPUT_S3_PATH" ]; then
