@@ -21,9 +21,11 @@
 #   SERVICE_URL_SCHEME=https ENVIRONMENT=dev \
 #   docker compose up --build
 #
-# LocalStack stands in for S3 so the entrypoint's results-publish step succeeds
-# (it exits non-zero if RESULTS_OUTPUT_S3_PATH is unset); reports also land in
-# ./reports on the host.
+# LocalStack stands in for S3 so the entrypoint's results-publish step has somewhere
+# to publish to, mirroring what a CDP task does. It is NOT required: with
+# RESULTS_OUTPUT_S3_PATH unset the entrypoint logs "skipping S3 publish" and exits 0.
+# Reports land in ./reports on the host either way, so drop both this service and
+# RESULTS_OUTPUT_S3_PATH if you only want the run and the report.
 services:
   development:
     build: .

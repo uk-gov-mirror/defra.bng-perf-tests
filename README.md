@@ -360,9 +360,14 @@ The `scenarios/project-list-payload.seed.mjs` Docker-Postgres seed remains the f
 local option (a single fixed-id, large baseline); `seed-via-api.mjs` is the portable
 equivalent for anywhere the DB is out of reach.
 
-> **Local shortcut:** from the harness, `npm run perf` does all of this for you — mints
-> the stub token, seeds the project under its sub, runs JMeter, and prints a per-endpoint
-> pass/fail summary. The steps below are for running the container directly / on CDP.
+> **Local shortcut, with a caveat:** from the harness, `npm run perf` mints the stub
+> token, seeds the project under its sub, runs JMeter and prints a per-endpoint
+> pass/fail summary. It covers the **home-page and project-list groups only**. It
+> drives `alpine/jmeter` directly rather than this repo's container, so it never runs
+> `entrypoint.sh` — and upload staging lives there. The ten `/baseline/validate/`
+> samplers get an empty upload id and the project-pool CSV is missing, so those phases
+> report errors that say nothing about the service. **For upload numbers, run the
+> container** (below). Closing that gap is harness work, tracked separately.
 
 Run it locally against a full local stack (frontend on `3000`, backend on `3001`, stub on
 `3200`) with:
