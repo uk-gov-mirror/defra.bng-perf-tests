@@ -48,14 +48,14 @@ const HTTP_BAD_REQUEST = 400
  * actually submits; the larger steps are there to find where the service stops
  * coping, not because anyone uploads them today.
  *
- * The top of the ramp is 20 000 parcels / ~15 MB rather than anything larger
+ * The top of the ramp is 12 000 parcels / ~9 MB. Bigger than that is not a size
+ * the service will ever be asked to handle — it is already two orders of
+ * magnitude past the real corpus — and it costs disproportionately to stage,
  * because bng-library's `partitionPolygon` re-sorts the whole parcel list on
- * every split, so generation is roughly quadratic: 5 000 parcels takes ~1.6 s,
- * 20 000 takes ~30 s, and 60 000 does not finish in a usable time. 20 000
- * already reaches the byte size a bigger parcel count was reaching before, so
- * the stress is unchanged — only the staging cost is.
+ * every split: generation is roughly quadratic, so 5 000 parcels takes ~1.6 s
+ * and 12 000 takes ~9 s.
  */
-const DEFAULT_SIZES = 'everyday:80,busy:800,large:5000,xlarge:12000,extreme:20000'
+const DEFAULT_SIZES = 'everyday:80,busy:800,large:5000,xlarge:12000'
 
 function parseSizes(spec) {
   return spec

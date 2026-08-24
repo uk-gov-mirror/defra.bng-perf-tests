@@ -144,7 +144,7 @@ function isConcurrency(label) {
 
 // The order the size labels are meant to be read in. A ramp presented out of
 // order is not a ramp — it has to climb down the page.
-const SIZE_ORDER = ['everyday', 'busy', 'large', 'xlarge', 'extreme']
+const SIZE_ORDER = ['everyday', 'busy', 'large', 'xlarge']
 
 function sortKey(label) {
   const users = /@ (\d+) user/.exec(label)

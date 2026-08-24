@@ -35,11 +35,11 @@ UPLOAD LOAD, which answers three questions a PM asks in this order:
   4. When does a BIG file become a problem?   -&gt; "Size ramp", the larger labels
 
      The ramp is ONE user doing a fixed, WEIGHTED pass: 20 everyday, 8 busy, 3 large,
-     2 xlarge, 1 extreme (sizeLoops*). One user is the point — these numbers only mean
+     2 xlarge (sizeLoops*). One user is the point — these numbers only mean
      "the cost of validating this file" if nothing else is hitting the service, which
      rules out giving each size its own thread. But an unweighted pass makes every size
      share a sample count with the slowest one, so `everyday` — the number asked for
-     first, and the only size real files actually reach — got as few samples as a 15 MB
+     first, and the only size real files actually reach — got as few samples as a 9 MB
      file did. The weights are roughly inverse to file size, so each size takes a
      comparable share of the window and the small ones earn a percentile rather than a
      single point. It is loop-count driven, so the counts are exact rather than
@@ -741,54 +741,6 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate xlarge (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
-            <stringProp name="HTTPSampler.method">POST</stringProp>
-            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-              <collectionProp name="Arguments.arguments">
-                <elementProp name="" elementType="HTTPArgument">
-                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                  <stringProp name="Argument.metadata">=</stringProp>
-                </elementProp>
-              </collectionProp>
-            </elementProp>
-          </HTTPSamplerProxy>
-          <hashTree>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="49586">200</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">8</intProp>
-            </ResponseAssertion>
-            <hashTree/>
-            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-              <collectionProp name="Asserion.test_strings">
-                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-              </collectionProp>
-              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-              <boolProp name="Assertion.assume_success">false</boolProp>
-              <intProp name="Assertion.test_type">2</intProp>
-            </ResponseAssertion>
-            <hashTree/>
-            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-              <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
-            </DurationAssertion>
-            <hashTree/>
-          </hashTree>
-        </hashTree>
-        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="extreme x N">
-          <stringProp name="LoopController.loops">${__P(sizeLoopsExtreme,1)}</stringProp>
-          <boolProp name="LoopController.continue_forever">true</boolProp>
-        </LoopController>
-        <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate extreme (1 user)">
-            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_extreme,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <boolProp name="HTTPSampler.use_keepalive">true</boolProp>

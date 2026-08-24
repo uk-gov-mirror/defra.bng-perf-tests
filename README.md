@@ -127,16 +127,16 @@ baseline every loaded phase is read against.
 #### The size ramp is one user, and weighted
 
 The ramp runs a single user through a **fixed, weighted pass** — 20 `everyday`,
-8 `busy`, 3 `large`, 2 `xlarge`, 1 `extreme` — rather than looping all five
-evenly until the clock runs out.
+8 `busy`, 3 `large`, 2 `xlarge` — rather than looping all four evenly until the
+clock runs out.
 
 One user is deliberate: `validate everyday (1 user)` only means "what an
 everyday upload costs" if nothing else is hitting the service while it is
 measured, which is why each size does **not** get its own thread. But an even
 pass has a flaw — every size shares a sample count with the slowest one, because
-one loop cannot finish until the 15.5 MB file has. `everyday` is the number a PM
+one loop cannot finish until the 9.3 MB file has. `everyday` is the number a PM
 asks for first and the only size real files actually reach (the reference corpus
-tops out at ~80 parcels), and it was getting as few samples as `extreme` did.
+tops out at ~80 parcels), and it was getting as few samples as `xlarge` did.
 
 The weights are roughly inverse to file size, so each size takes a comparable
 share of the window and the small ones earn a percentile instead of a single
@@ -144,7 +144,7 @@ point. Because the pass is loop-count driven, those counts are **exact** rather
 than "whatever fitted" — a run either produces 20 `everyday` samples or the
 `SIZE_RAMP_DURATION_SECONDS` guard tripped, which is itself worth knowing.
 
-Set the weights with `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE,EXTREME}`, or run
+Set the weights with `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}`, or run
 the whole pass more than once with `SIZE_RAMP_LOOPS`. If you raise them far
 enough to overrun the window, raise `SIZE_RAMP_DURATION_SECONDS` too — the rest
 of the timeline re-derives around it.
@@ -189,16 +189,15 @@ where the service stops coping, not because anyone submits them today.
 | `busy`     | 800     | 704 KB    | 0.08 s     |
 | `large`    | 5 000   | 4.0 MB    | 1.6 s      |
 | `xlarge`   | 12 000  | 9.3 MB    | 9.0 s      |
-| `extreme`  | 20 000  | 15.5 MB   | 30 s       |
 
-Generation is **super-linear** in parcel count — `partitionPolygon` in
-`bng-library` re-sorts the whole parcel list on every split, so 4× the parcels
-costs roughly 19× the time. 60 000 parcels does not finish in a usable time,
-which is why the ramp stops at 20 000. That is not a loss of coverage: at
-15.5 MB, 20 000 parcels already produces a larger file than the previous
-top-of-ramp did, so the service sees the same stress and only the staging cost
-changes. Staging the whole ramp costs ~42 s of generation before JMeter starts;
-each step's time is logged so a slow-looking start is identifiable as setup.
+The ramp stops at `xlarge`. At 12 000 parcels it is already two orders of
+magnitude past anything the service is submitted in practice, so a bigger step
+answers a question nobody is going to ask — and it is the expensive end to
+stage, because generation is **super-linear** in parcel count: `partitionPolygon`
+in `bng-library` re-sorts the whole parcel list on every split, so 4× the
+parcels costs roughly 19× the time. Staging the whole ramp costs ~11 s of
+generation before JMeter starts; each step's time is logged so a slow-looking
+start is identifiable as setup.
 
 #### Staging: what is measured and what is not
 
@@ -233,7 +232,7 @@ run is meaningless.
 | Env var                          | Default                                        | Purpose                                                        |
 | -------------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
 | `TEST_SCENARIO`                  | `bng-perf`                                     | Escape hatch only — leave unset to run the whole suite.         |
-| `UPLOAD_SIZES`                   | `everyday:80,busy:800,large:5000,xlarge:12000,extreme:20000` | `label:parcels` pairs to stage.                    |
+| `UPLOAD_SIZES`                   | `everyday:80,busy:800,large:5000,xlarge:12000` | `label:parcels` pairs to stage.                                |
 | `STAGE_UPLOADS`                  | `true` for this plan                           | Skip staging (e.g. reusing already-staged uploads).             |
 | `CDP_UPLOADER_URL`               | `https://cdp-uploader.<ENVIRONMENT>.cdp-int.defra.cloud` | The uploader to POST staged files to.                 |
 | `PROJECT_POOL_SIZE`              | `40`                                           | Projects to spread concurrent writes across. Keep ≥ max threads. |
@@ -248,8 +247,8 @@ run is meaningless.
 | `VALIDATE_RESPONSE_TIMEOUT_MS`   | `120000`                                       | Socket timeout — above this a sample is an error, not a slow success. |
 | `SIZE_RAMP_DURATION_SECONDS`     | `60`                                           | Guard on the size-ramp pass, and the window the schedule reserves for it. |
 | `SIZE_RAMP_THREADS`              | `1`                                            | Users on the size ramp. `0` suppresses the phase — see below.    |
-| `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the five sizes.                            |
-| `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE,EXTREME}` | `20/8/3/2/1`                  | Samples per size in a pass. Weighted so small files earn a percentile. |
+| `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the four sizes.                            |
+| `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}` | `20/8/3/2`                            | Samples per size in a pass. Weighted so small files earn a percentile. |
 | `SIZE_RAMP_DELAY_SECONDS`        | _derived_                                      | When the size ramp starts.                                      |
 | `CONC_STEP_DURATION_SECONDS`     | `30`                                           | How long each concurrency step runs.                            |
 | `CONC_DELAY_{1,2,5,10,20}`       | _derived_                                      | When each concurrency step starts.                              |

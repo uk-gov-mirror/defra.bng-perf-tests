@@ -148,7 +148,7 @@ echo "                       conc ${CONC_DELAY_1}/${CONC_DELAY_2}/${CONC_DELAY_5
 echo "  stage uploads:       ${STAGE_UPLOADS}"
 if [ "${STAGE_UPLOADS}" = "true" ]; then
   echo "  cdp-uploader:        ${CDP_UPLOADER_URL}"
-  echo "  upload sizes:        ${UPLOAD_SIZES:-<defaults: everyday,busy,large,xlarge,extreme>}"
+  echo "  upload sizes:        ${UPLOAD_SIZES:-<defaults: everyday,busy,large,xlarge>}"
 fi
 echo "────────────────────────────────────────────────────────────────────────────────────"
 set -x
@@ -317,7 +317,6 @@ add_prop sizeLoopsEveryday "${SIZE_LOOPS_EVERYDAY}"
 add_prop sizeLoopsBusy "${SIZE_LOOPS_BUSY}"
 add_prop sizeLoopsLarge "${SIZE_LOOPS_LARGE}"
 add_prop sizeLoopsXlarge "${SIZE_LOOPS_XLARGE}"
-add_prop sizeLoopsExtreme "${SIZE_LOOPS_EXTREME}"
 add_prop concStepDurationSeconds "${CONC_STEP_DURATION_SECONDS}"
 add_prop concDelay1 "${CONC_DELAY_1}"
 add_prop concDelay2 "${CONC_DELAY_2}"
