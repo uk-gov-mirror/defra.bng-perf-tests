@@ -28,15 +28,21 @@ import { makeGeoPackage } from './make-gpkg.mjs'
 const API_BASE_URL = process.env.API_BASE_URL
 const BEARER_TOKEN = process.env.BEARER_TOKEN
 const CDP_UPLOADER_URL = process.env.CDP_UPLOADER_URL
-const STAGE_DIR = process.env.STAGE_DIR ?? '/opt/perftest/stage'
-const PROJECTS_CSV = process.env.PROJECTS_CSV ?? join(STAGE_DIR, 'projects.csv')
-const S3_BUCKET = process.env.UPLOAD_S3_BUCKET ?? 'baseline-files'
+// `||`, not `??`, throughout: entrypoint.sh passes every one of these on the
+// command line whether or not the operator set it, so an unset variable arrives
+// as an empty string rather than as undefined. `??` treats that as a deliberate
+// value and the defaults below never apply — an empty UPLOAD_READY_TIMEOUT_MS
+// becomes a 0 ms deadline, an empty PROJECT_POOL_SIZE a pool of none. This is
+// the same guard seed-via-api.mjs's `positiveIntEnv` applies for the same reason.
+const STAGE_DIR = process.env.STAGE_DIR || '/opt/perftest/stage'
+const PROJECTS_CSV = process.env.PROJECTS_CSV || join(STAGE_DIR, 'projects.csv')
+const S3_BUCKET = process.env.UPLOAD_S3_BUCKET || 'baseline-files'
 
 const UPLOAD_READY_TIMEOUT_MS = Number(
-  process.env.UPLOAD_READY_TIMEOUT_MS ?? 180_000
+  process.env.UPLOAD_READY_TIMEOUT_MS || 180_000
 )
 const UPLOAD_POLL_INTERVAL_MS = 1000
-const PROJECT_POOL_SIZE = Number(process.env.PROJECT_POOL_SIZE ?? 40)
+const PROJECT_POOL_SIZE = Number(process.env.PROJECT_POOL_SIZE || 40)
 
 const HTTP_BAD_REQUEST = 400
 
@@ -218,7 +224,7 @@ async function main() {
   }
   mkdirSync(STAGE_DIR, { recursive: true })
 
-  const sizes = parseSizes(process.env.UPLOAD_SIZES ?? DEFAULT_SIZES)
+  const sizes = parseSizes(process.env.UPLOAD_SIZES || DEFAULT_SIZES)
   if (sizes.length === 0) {
     throw new Error(`no usable sizes in UPLOAD_SIZES="${process.env.UPLOAD_SIZES}"`)
   }
