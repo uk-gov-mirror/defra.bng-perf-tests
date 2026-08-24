@@ -247,12 +247,28 @@ run is meaningless.
 | `EVERYDAY_BUDGET_MS`             | `5000`                                         | Tighter budget for the everyday-sized file.                     |
 | `VALIDATE_RESPONSE_TIMEOUT_MS`   | `120000`                                       | Socket timeout — above this a sample is an error, not a slow success. |
 | `SIZE_RAMP_DURATION_SECONDS`     | `60`                                           | Guard on the size-ramp pass, and the window the schedule reserves for it. |
+| `SIZE_RAMP_THREADS`              | `1`                                            | Users on the size ramp. `0` suppresses the phase — see below.    |
 | `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the five sizes.                            |
 | `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE,EXTREME}` | `20/8/3/2/1`                  | Samples per size in a pass. Weighted so small files earn a percentile. |
 | `SIZE_RAMP_DELAY_SECONDS`        | _derived_                                      | When the size ramp starts.                                      |
 | `CONC_STEP_DURATION_SECONDS`     | `30`                                           | How long each concurrency step runs.                            |
 | `CONC_DELAY_{1,2,5,10,20}`       | _derived_                                      | When each concurrency step starts.                              |
 | `CONC_USERS_{1,2,5,10,20}`       | `1/2/5/10/20`                                  | Threads at each step.                                           |
+
+**Running only the everyday half.** Every upload phase's thread count is a
+property, so setting them all to `0` suppresses that half of the plan and leaves
+the home-page and project-list groups — a ~25 s run with nothing in it that needs
+staged uploads. Useful locally when you are working on the list endpoints rather
+than on upload:
+
+```sh
+STAGE_UPLOADS=false PROBE_THREADS=0 SIZE_RAMP_THREADS=0 \
+CONC_USERS_1=0 CONC_USERS_2=0 CONC_USERS_5=0 CONC_USERS_10=0 CONC_USERS_20=0 \
+docker compose up --build
+```
+
+Leave `RESULTS_OUTPUT_S3_PATH` unset and the S3 publish is skipped too, so the
+LocalStack service can go with it.
 
 > **Set durations, not delays.** JMeter starts a thread group at an absolute
 > delay from the start of the run, so lengthening one phase means pushing every

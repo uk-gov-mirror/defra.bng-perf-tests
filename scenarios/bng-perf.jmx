@@ -108,6 +108,9 @@ Runtime properties (all overridable with -J..., wired from env vars in entrypoin
   probeThinkMs / probeMaxLatencyMs probe pacing and its latency budget
   validateBudgetMs                 latency budget for a validate call (default 30000)
   sizeRamp* / conc*                per-phase delay, duration and thread counts
+  sizeRampThreads                  users on the size ramp (default 1). Set 0 — as with
+                                   probeThreads / concUsers* — to suppress the phase, which
+                                   is how a local run skips the upload half.
   sizeRampLoops                    weighted passes over the size ramp (default 1)
   sizeLoops&lt;Size&gt;                  samples per size in a pass (default 20/8/3/2/1)
 
@@ -536,7 +539,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
         <hashTree/>
       </hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Size ramp (1 user, one file size after another)">
-        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(sizeRampThreads,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(sizeRampDurationSeconds,60)}</stringProp>
