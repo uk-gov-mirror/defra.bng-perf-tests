@@ -141,9 +141,6 @@ function isSizeRamp(label) {
 function isConcurrency(label) {
   return label.includes('@') && label.includes('user(s)')
 }
-function isBurst(label) {
-  return label.includes('burst')
-}
 
 // The order the size labels are meant to be read in. A ramp presented out of
 // order is not a ramp — it has to climb down the page.
@@ -192,11 +189,7 @@ function collateralImpact(samples) {
     if (isProbe(s.label)) {
       continue
     }
-    const phase = isSizeRamp(s.label)
-      ? 'size ramp'
-      : isBurst(s.label)
-        ? 'burst'
-        : s.label
+    const phase = isSizeRamp(s.label) ? 'size ramp' : s.label
     const window = phases.get(phase) ?? { from: Infinity, to: -Infinity }
     window.from = Math.min(window.from, s.ts)
     window.to = Math.max(window.to, s.ts + s.elapsed)
@@ -249,8 +242,7 @@ function main() {
 
   const groups = [
     ['How long does one upload take, by file size?', isSizeRamp],
-    ['What happens as more people upload at once?', isConcurrency],
-    ['Large files back to back', isBurst]
+    ['What happens as more people upload at once?', isConcurrency]
   ]
   for (const [title, predicate] of groups) {
     const byLabel = summariseGroup(samples, predicate)

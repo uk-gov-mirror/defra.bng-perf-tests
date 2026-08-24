@@ -6,7 +6,7 @@
 is what the CDP portal serves (it renders a single dashboard from the root of the
 results prefix). Nothing needs selecting: an unset TEST_SCENARIO runs all of this.
 
-Four thread groups answer "is everyday use healthy?", and six answer "what
+Two thread groups answer "is everyday use healthy?", and seven answer "what
 happens when uploads get big or numerous?".
 
 EVERYDAY (runs first, on its own, so its numbers are uncontended)
@@ -33,7 +33,19 @@ UPLOAD LOAD, which answers three questions a PM asks in this order:
 
   3. What does an everyday upload cost?       -&gt; "Size ramp", `everyday` label
   4. When does a BIG file become a problem?   -&gt; "Size ramp", the larger labels
-  5. When do MANY big files become a problem? -&gt; "Concurrency ramp" + "Burst"
+
+     The ramp is ONE user doing a fixed, WEIGHTED pass: 20 everyday, 8 busy, 3 large,
+     2 xlarge, 1 extreme (sizeLoops*). One user is the point — these numbers only mean
+     "the cost of validating this file" if nothing else is hitting the service, which
+     rules out giving each size its own thread. But an unweighted pass makes every size
+     share a sample count with the slowest one, so `everyday` — the number asked for
+     first, and the only size real files actually reach — got as few samples as a 15 MB
+     file did. The weights are roughly inverse to file size, so each size takes a
+     comparable share of the window and the small ones earn a percentile rather than a
+     single point. It is loop-count driven, so the counts are exact rather than
+     "whatever fitted"; sizeRampDurationSeconds is a guard against a slow backend, and
+     the window the schedule reserves for the phase.
+  5. When do MANY big files become a problem? -&gt; "Concurrency ramp"
 
 and, running alongside all of it, a fourth that matters more than any of them:
 
@@ -47,17 +59,21 @@ starts AFTER the everyday groups finish, so the quiet stretch before the size ra
 is a genuine baseline to compare the loaded phases against.
 
 Shape of the run. Every group is scheduled, so the phases run in sequence while
-the probe spans the upload half:
+the probe spans the upload half. Nominal run is 290s, so a change can be measured
+while you wait for it rather than scheduled around:
 
-  home + list |==|
-  probe             |=================================================|
-  size ramp           |=========|
-  1 user                          |====|
-  2 users                               |====|
-  5 users                                     |====|
-  10 users                                          |====|
-  20 users                                                |====|
-  burst                                                          |======|
+  seconds     0    25   55        115  150   185   220   255   290
+  home + list |====|
+  probe            |==========================================|
+  size ramp             |==========|
+  1 user                            |====|
+  2 users                                 |====|
+  5 users                                       |====|
+  10 users                                            |====|
+  20 users                                                  |====|
+
+The stretch between the probe starting and the size ramp (30-55s here) is quiet
+by construction: it is the baseline every loaded phase is read against.
 
 Uploads are staged BEFORE JMeter starts (scripts/stage-uploads.mjs): initiate,
 POST to the CDP Uploader, wait for the scan. Only the validate call is measured
@@ -84,18 +100,23 @@ Runtime properties (all overridable with -J..., wired from env vars in entrypoin
   limit / offset                   pagination params exercised on both endpoints (default 50 / 0)
   homeThreads / homeRampSeconds / homeLoops   home-page load profile (default 1 / 1 / 5)
   listThreads / listRampSeconds / listLoops   backend load profile (default 10 / 10 / 20)
-  everydayPhaseDurationSeconds     cap on the two everyday groups (default 90)
+  everydayPhaseDurationSeconds     cap on the two everyday groups (default 25)
   uploadId_&lt;label&gt;                 staged upload ids, one per size label
   projectsCsv                      path to the staged project id pool
-  probeDelaySeconds                when the probe starts (default 120)
-  probeDurationSeconds             how long the background probe runs (default 740)
+  probeDelaySeconds                when the probe starts (default 30)
+  probeDurationSeconds             how long the background probe runs (default 260)
   probeThinkMs / probeMaxLatencyMs probe pacing and its latency budget
   validateBudgetMs                 latency budget for a validate call (default 30000)
-  sizeRamp* / conc* / burst*       per-phase delay, duration and thread counts
+  sizeRamp* / conc*                per-phase delay, duration and thread counts
+  sizeRampLoops                    weighted passes over the size ramp (default 1)
+  sizeLoops&lt;Size&gt;                  samples per size in a pass (default 20/8/3/2/1)
 
-Phase delays are ABSOLUTE seconds from the start of the run, not relative. Lengthen
-a phase and you must push every later delay out too, or phases overlap and the
-concurrency figures stop meaning what they say.</stringProp>
+Phase delays are ABSOLUTE seconds from the start of the run, so every duration change
+has to be propagated to every later phase. Do NOT do that by hand: entrypoint.sh
+DERIVES all of them from the phase durations plus PHASE_GAP_SECONDS, and the defaults
+above are simply that derivation written out, so the plan is still self-consistent
+when JMeter is driven directly. Override a duration via the env
+vars and the delays move with it; override a delay and you own the arithmetic.</stringProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
         <collectionProp name="Arguments.arguments">
           <elementProp name="maxResponseMs" elementType="Argument">
@@ -161,7 +182,7 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(homeThreads,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(homeRampSeconds,1)}</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(everydayPhaseDurationSeconds,90)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(everydayPhaseDurationSeconds,25)}</stringProp>
         <stringProp name="ThreadGroup.delay">0</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
@@ -204,7 +225,7 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(listThreads,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(listRampSeconds,10)}</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(everydayPhaseDurationSeconds,90)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(everydayPhaseDurationSeconds,25)}</stringProp>
         <stringProp name="ThreadGroup.delay">0</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
@@ -420,8 +441,8 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(probeThreads,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(probeDurationSeconds,740)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(probeDelaySeconds,120)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(probeDurationSeconds,260)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(probeDelaySeconds,30)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -518,13 +539,13 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">1</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(sizeRampDurationSeconds,180)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(sizeRampDelaySeconds,180)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(sizeRampDurationSeconds,60)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(sizeRampDelaySeconds,55)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
-          <stringProp name="LoopController.loops">-1</stringProp>
-          <boolProp name="LoopController.continue_forever">true</boolProp>
+          <stringProp name="LoopController.loops">${__P(sizeRampLoops,1)}</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
         </elementProp>
       </ThreadGroup>
       <hashTree>
@@ -566,223 +587,253 @@ concurrency figures stop meaning what they say.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate everyday (1 user)">
-          <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_everyday,)}</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="everyday x N">
+          <stringProp name="LoopController.loops">${__P(sizeLoopsEveryday,20)}</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </LoopController>
         <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-            <stringProp name="DurationAssertion.duration">${everydayBudgetMs}</stringProp>
-          </DurationAssertion>
-          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate everyday (1 user)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_everyday,)}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${everydayBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate busy (1 user)">
-          <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_busy,)}</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="busy x N">
+          <stringProp name="LoopController.loops">${__P(sizeLoopsBusy,8)}</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </LoopController>
         <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-            <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
-          </DurationAssertion>
-          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate busy (1 user)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_busy,)}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large (1 user)">
-          <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="large x N">
+          <stringProp name="LoopController.loops">${__P(sizeLoopsLarge,3)}</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </LoopController>
         <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-            <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
-          </DurationAssertion>
-          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large (1 user)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate xlarge (1 user)">
-          <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="xlarge x N">
+          <stringProp name="LoopController.loops">${__P(sizeLoopsXlarge,2)}</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </LoopController>
         <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-            <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
-          </DurationAssertion>
-          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate xlarge (1 user)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate extreme (1 user)">
-          <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_extreme,)}</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="extreme x N">
+          <stringProp name="LoopController.loops">${__P(sizeLoopsExtreme,1)}</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </LoopController>
         <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-            <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
-          </DurationAssertion>
-          <hashTree/>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate extreme (1 user)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_extreme,)}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
         </hashTree>
       </hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Concurrency 1 user(s) — large file">
         <stringProp name="ThreadGroup.num_threads">${__P(concUsers1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,60)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(concDelay1,375)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(concDelay1,120)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -876,8 +927,8 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(concUsers2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,60)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(concDelay2,445)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(concDelay2,155)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -971,8 +1022,8 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(concUsers5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,60)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(concDelay5,515)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(concDelay5,190)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1066,8 +1117,8 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(concUsers10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,60)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(concDelay10,585)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(concDelay10,225)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1161,8 +1212,8 @@ concurrency figures stop meaning what they say.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(concUsers20,20)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,60)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(concDelay20,655)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(concStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(concDelay20,260)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1210,101 +1261,6 @@ concurrency figures stop meaning what they say.</stringProp>
         </CSVDataSet>
         <hashTree/>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large @ 20 user(s)">
-          <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
-          <stringProp name="HTTPSampler.method">POST</stringProp>
-          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
-          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
-          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
-          <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="" elementType="HTTPArgument">
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
-                <stringProp name="Argument.metadata">=</stringProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
-        </HTTPSamplerProxy>
-        <hashTree>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="49586">200</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">8</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
-            <collectionProp name="Asserion.test_strings">
-              <stringProp name="-1">&quot;valid&quot;:true</stringProp>
-            </collectionProp>
-            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
-            <boolProp name="Assertion.assume_success">false</boolProp>
-            <intProp name="Assertion.test_type">2</intProp>
-          </ResponseAssertion>
-          <hashTree/>
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-            <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
-          </DurationAssertion>
-          <hashTree/>
-        </hashTree>
-      </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Burst — large files back to back">
-        <stringProp name="ThreadGroup.num_threads">${__P(burstThreads,10)}</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
-        <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(burstDurationSeconds,120)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(burstDelaySeconds,730)}</stringProp>
-        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
-        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
-        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
-          <stringProp name="LoopController.loops">-1</stringProp>
-          <boolProp name="LoopController.continue_forever">true</boolProp>
-        </elementProp>
-      </ThreadGroup>
-      <hashTree>
-        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="Backend defaults">
-          <stringProp name="HTTPSampler.domain">${__P(backendDomain,bng-metric-backend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
-          <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
-          <stringProp name="HTTPSampler.port">${__P(backendPort,${__P(port,443)})}</stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
-            <collectionProp name="Arguments.arguments"/>
-          </elementProp>
-        </ConfigTestElement>
-        <hashTree/>
-        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth + JSON headers">
-          <collectionProp name="HeaderManager.headers">
-            <elementProp name="" elementType="Header">
-              <stringProp name="Header.name">Authorization</stringProp>
-              <stringProp name="Header.value">Bearer ${bearerToken}</stringProp>
-            </elementProp>
-            <elementProp name="" elementType="Header">
-              <stringProp name="Header.name">Content-Type</stringProp>
-              <stringProp name="Header.value">application/json</stringProp>
-            </elementProp>
-            <elementProp name="" elementType="Header">
-              <stringProp name="Header.name">Accept</stringProp>
-              <stringProp name="Header.value">application/json</stringProp>
-            </elementProp>
-          </collectionProp>
-        </HeaderManager>
-        <hashTree/>
-        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Project id pool">
-          <stringProp name="filename">${__P(projectsCsv,/opt/perftest/stage/projects.csv)}</stringProp>
-          <stringProp name="variableNames">projectId</stringProp>
-          <stringProp name="delimiter">,</stringProp>
-          <boolProp name="quotedData">false</boolProp>
-          <boolProp name="recycle">true</boolProp>
-          <boolProp name="stopThread">false</boolProp>
-          <stringProp name="shareMode">shareMode.all</stringProp>
-          <boolProp name="ignoreFirstLine">false</boolProp>
-          <stringProp name="fileEncoding"></stringProp>
-        </CSVDataSet>
-        <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large - burst">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>

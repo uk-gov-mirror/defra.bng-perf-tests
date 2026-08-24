@@ -29,22 +29,21 @@ from the **root** of the results prefix, so one report per task is what it can s
 | `Everyday user (background probe)`| both                  | What an ordinary user experiences *while* the upload phases run.          |
 | `Size ramp`                       | `bng-metric-backend`  | Cost of validating one file, across five file sizes.                      |
 | `Concurrency 1/2/5/10/20 user(s)` | `bng-metric-backend`  | Cost as simultaneous uploads increase.                                    |
-| `Burst`                           | `bng-metric-backend`  | Large files back to back, no think time.                                   |
 
 The first two run **first and alone**, so their numbers are uncontended and mean what
 they did before. The upload phases follow, sequenced by wall clock, with the probe
-spanning them:
+spanning them. A default run is **290 s — under five minutes**:
 
 ```
-home + list |==|
-probe             |=================================================|
-size ramp           |=========|
-1 user                          |====|
-2 users                               |====|
-5 users                                     |====|
-10 users                                          |====|
-20 users                                                |====|
-burst                                                          |======|
+seconds     0    25   55        115  150   185   220   255   290
+home + list |====|
+probe            |==========================================|
+size ramp             |==========|
+1 user                            |====|
+2 users                                 |====|
+5 users                                       |====|
+10 users                                            |====|
+20 users                                                  |====|
 ```
 
 Each group targets its own host (`frontendDomain` / `backendDomain`), and the Bearer
@@ -112,15 +111,43 @@ running **concurrently** with the load can show it. Every phase is scheduled, so
 they run in sequence while the probe spans the whole run:
 
 ```
-probe      |=====================================================|
-size ramp    |=========|
-1 user                   |====|
-2 users                        |====|
-5 users                              |====|
-10 users                                   |====|
-20 users                                         |====|
-burst                                                   |======|
+seconds    30   55        115  150   185   220   255   290
+probe      |==========================================|
+size ramp       |==========|
+1 user                      |====|
+2 users                           |====|
+5 users                                 |====|
+10 users                                      |====|
+20 users                                            |====|
 ```
+
+The 30-55 s stretch, after the probe starts but before any load, is the quiet
+baseline every loaded phase is read against.
+
+#### The size ramp is one user, and weighted
+
+The ramp runs a single user through a **fixed, weighted pass** — 20 `everyday`,
+8 `busy`, 3 `large`, 2 `xlarge`, 1 `extreme` — rather than looping all five
+evenly until the clock runs out.
+
+One user is deliberate: `validate everyday (1 user)` only means "what an
+everyday upload costs" if nothing else is hitting the service while it is
+measured, which is why each size does **not** get its own thread. But an even
+pass has a flaw — every size shares a sample count with the slowest one, because
+one loop cannot finish until the 15.5 MB file has. `everyday` is the number a PM
+asks for first and the only size real files actually reach (the reference corpus
+tops out at ~80 parcels), and it was getting as few samples as `extreme` did.
+
+The weights are roughly inverse to file size, so each size takes a comparable
+share of the window and the small ones earn a percentile instead of a single
+point. Because the pass is loop-count driven, those counts are **exact** rather
+than "whatever fitted" — a run either produces 20 `everyday` samples or the
+`SIZE_RAMP_DURATION_SECONDS` guard tripped, which is itself worth knowing.
+
+Set the weights with `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE,EXTREME}`, or run
+the whole pass more than once with `SIZE_RAMP_LOOPS`. If you raise them far
+enough to overrun the window, raise `SIZE_RAMP_DURATION_SECONDS` too — the rest
+of the timeline re-derives around it.
 
 #### What it uploads, and why it is generated
 
@@ -211,21 +238,38 @@ run is meaningless.
 | `CDP_UPLOADER_URL`               | `https://cdp-uploader.<ENVIRONMENT>.cdp-int.defra.cloud` | The uploader to POST staged files to.                 |
 | `PROJECT_POOL_SIZE`              | `40`                                           | Projects to spread concurrent writes across. Keep ≥ max threads. |
 | `UPLOAD_READY_TIMEOUT_MS`        | `180000`                                       | How long to wait for the uploader's scan. Large files are slow. |
-| `PROBE_DURATION_SECONDS`         | `700`                                          | How long the background probe runs. Must span every phase.      |
+| `PHASE_GAP_SECONDS`              | `5`                                            | Dead time between phases, so one phase's in-flight requests drain before the next starts. |
+| `EVERYDAY_PHASE_DURATION_SECONDS`| `25`                                           | Cap on the two everyday groups. A guard, not a budget — they are loop-count driven and finish sooner. |
+| `PROBE_BASELINE_SECONDS`         | `25`                                           | Quiet stretch between the probe starting and the first load phase. |
+| `PROBE_DURATION_SECONDS`         | _derived_                                      | How long the background probe runs. Derived to span every phase; override and you own it. |
 | `PROBE_THINK_MS` / `PROBE_MAX_LATENCY_MS` | `2000` / `2000`                       | Probe pacing, and the latency it is judged against.             |
 | `VALIDATE_BUDGET_MS`             | `30000`                                        | Latency budget for a validate call under load.                  |
 | `EVERYDAY_BUDGET_MS`             | `5000`                                         | Tighter budget for the everyday-sized file.                     |
 | `VALIDATE_RESPONSE_TIMEOUT_MS`   | `120000`                                       | Socket timeout — above this a sample is an error, not a slow success. |
-| `SIZE_RAMP_DELAY_SECONDS` / `SIZE_RAMP_DURATION_SECONDS` | `5` / `180`            | Size-ramp phase window.                                         |
-| `CONC_STEP_DURATION_SECONDS`     | `60`                                           | How long each concurrency step runs.                            |
-| `CONC_DELAY_{1,2,5,10,20}`       | `200/270/340/410/480`                          | When each concurrency step starts.                              |
+| `SIZE_RAMP_DURATION_SECONDS`     | `60`                                           | Guard on the size-ramp pass, and the window the schedule reserves for it. |
+| `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the five sizes.                            |
+| `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE,EXTREME}` | `20/8/3/2/1`                  | Samples per size in a pass. Weighted so small files earn a percentile. |
+| `SIZE_RAMP_DELAY_SECONDS`        | _derived_                                      | When the size ramp starts.                                      |
+| `CONC_STEP_DURATION_SECONDS`     | `30`                                           | How long each concurrency step runs.                            |
+| `CONC_DELAY_{1,2,5,10,20}`       | _derived_                                      | When each concurrency step starts.                              |
 | `CONC_USERS_{1,2,5,10,20}`       | `1/2/5/10/20`                                  | Threads at each step.                                           |
-| `BURST_THREADS` / `BURST_DELAY_SECONDS` / `BURST_DURATION_SECONDS` | `10` / `555` / `120` | Back-to-back phase.                              |
 
-> **Sequencing is by wall clock.** The phase delays are absolute seconds from
-> the start of the run, so if you lengthen one phase you must push the later
-> delays out too — otherwise phases overlap and the concurrency figures stop
-> meaning what they say.
+> **Set durations, not delays.** JMeter starts a thread group at an absolute
+> delay from the start of the run, so lengthening one phase means pushing every
+> later phase out too — and a missed one does not fail anything, it just makes a
+> concurrency figure quietly stop meaning what its label says. `entrypoint.sh`
+> therefore **derives** every delay from the phase durations plus
+> `PHASE_GAP_SECONDS`, and the probe's duration from where the last phase ends.
+> Change a duration and the rest of the timeline moves with it; the plan's own
+> `-J` defaults are that same derivation written out, so driving JMeter directly
+> still gets a consistent schedule. Setting a delay explicitly overrides the
+> derivation, and from there the arithmetic is yours.
+
+**Want more samples rather than a faster answer?** Lengthen the phase you care
+about — there is no second "deep" profile, because a duration *is* the knob and
+the timeline re-derives around it. `CONC_STEP_DURATION_SECONDS=45` turns the
+~5 min run into ~6 min with half as much again behind every concurrency
+percentile, and moves the four later steps and the probe to match.
 
 ### Authenticating: a real cdp-defra-id-stub token
 

@@ -79,6 +79,54 @@ else
 fi
 PROJECTS_CSV=${PROJECTS_CSV:-${JM_HOME}/stage/projects.csv}
 
+# ── Phase schedule ───────────────────────────────────────────────────────────
+# The upload phases run one after another, and JMeter starts a thread group at an
+# ABSOLUTE delay from the start of the run. Writing those delays out by hand means
+# every duration change has to be propagated to every later phase; miss one and the
+# phases overlap, which does not fail anything — it just makes a concurrency figure
+# quietly stop meaning what its label says. So the delays are DERIVED: choose the
+# durations, and the start times fall out of them.
+#
+# The durations below add up to a ~5 minute run — short enough that a change can be
+# measured while you wait for it. Want more samples behind a percentile? Lengthen
+# the phase you care about and the rest of the timeline follows; there is no second
+# "deep" profile to remember, because a duration IS the knob.
+
+# The two everyday groups are loop-count driven (home 1x5, list 10x20 over a 10s
+# ramp), so this cap only bites when the backend is slow. It is a guard, not a
+# budget — the groups end when their loops do.
+EVERYDAY_PHASE_DURATION_SECONDS=${EVERYDAY_PHASE_DURATION_SECONDS:-25}
+PROBE_BASELINE_SECONDS=${PROBE_BASELINE_SECONDS:-25}
+SIZE_RAMP_DURATION_SECONDS=${SIZE_RAMP_DURATION_SECONDS:-60}
+CONC_STEP_DURATION_SECONDS=${CONC_STEP_DURATION_SECONDS:-30}
+
+# Dead time between phases, so the previous step's in-flight requests drain before
+# the next one starts and its latencies are not charged to the wrong phase.
+PHASE_GAP_SECONDS=${PHASE_GAP_SECONDS:-5}
+
+# Each phase starts a gap after the previous one ends. An explicitly-set delay is
+# honoured as-is: override one and you own the arithmetic from there on.
+PROBE_DELAY_SECONDS=${PROBE_DELAY_SECONDS:-$((EVERYDAY_PHASE_DURATION_SECONDS + PHASE_GAP_SECONDS))}
+# The probe's own baseline window is the quiet stretch between it starting and the
+# first load phase — that is what every loaded phase is compared against.
+SIZE_RAMP_DELAY_SECONDS=${SIZE_RAMP_DELAY_SECONDS:-$((PROBE_DELAY_SECONDS + PROBE_BASELINE_SECONDS))}
+
+PHASE_CURSOR=$((SIZE_RAMP_DELAY_SECONDS + SIZE_RAMP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+CONC_DELAY_1=${CONC_DELAY_1:-${PHASE_CURSOR}}
+PHASE_CURSOR=$((CONC_DELAY_1 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+CONC_DELAY_2=${CONC_DELAY_2:-${PHASE_CURSOR}}
+PHASE_CURSOR=$((CONC_DELAY_2 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+CONC_DELAY_5=${CONC_DELAY_5:-${PHASE_CURSOR}}
+PHASE_CURSOR=$((CONC_DELAY_5 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+CONC_DELAY_10=${CONC_DELAY_10:-${PHASE_CURSOR}}
+PHASE_CURSOR=$((CONC_DELAY_10 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+CONC_DELAY_20=${CONC_DELAY_20:-${PHASE_CURSOR}}
+
+# The probe has to outlive the last phase or the tail of the run is unobserved —
+# which is exactly where an availability problem would show up.
+RUN_END_SECONDS=$((CONC_DELAY_20 + CONC_STEP_DURATION_SECONDS))
+PROBE_DURATION_SECONDS=${PROBE_DURATION_SECONDS:-$((RUN_END_SECONDS - PROBE_DELAY_SECONDS))}
+
 # One-shot run-config banner. xtrace off so it reads as a clean block and so no
 # secret can ever be echoed here. Surfaces the resolved config up front — the
 # resolved scenario, the two targets, and OIDC_REDIRECT_URI (confirms the
@@ -94,6 +142,9 @@ echo "  backend target:      ${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND
 echo "  stub base URL:       ${STUB_BASE_URL}"
 echo "  oidc redirect_uri:   ${OIDC_REDIRECT_URI}"
 echo "  seed via API:        ${SEED_VIA_API} (target ${SEED_PROJECT_COUNT:-5} project(s))"
+echo "  nominal run:         ${RUN_END_SECONDS}s"
+echo "  phase schedule:      everyday 0-${EVERYDAY_PHASE_DURATION_SECONDS}s | probe ${PROBE_DELAY_SECONDS}s+${PROBE_DURATION_SECONDS}s | ramp ${SIZE_RAMP_DELAY_SECONDS}s+${SIZE_RAMP_DURATION_SECONDS}s"
+echo "                       conc ${CONC_DELAY_1}/${CONC_DELAY_2}/${CONC_DELAY_5}/${CONC_DELAY_10}/${CONC_DELAY_20}s, ${CONC_STEP_DURATION_SECONDS}s each"
 echo "  stage uploads:       ${STAGE_UPLOADS}"
 if [ "${STAGE_UPLOADS}" = "true" ]; then
   echo "  cdp-uploader:        ${CDP_UPLOADER_URL}"
@@ -260,6 +311,12 @@ add_prop everydayBudgetMs "${EVERYDAY_BUDGET_MS}"
 add_prop validateResponseTimeoutMs "${VALIDATE_RESPONSE_TIMEOUT_MS}"
 add_prop sizeRampDelaySeconds "${SIZE_RAMP_DELAY_SECONDS}"
 add_prop sizeRampDurationSeconds "${SIZE_RAMP_DURATION_SECONDS}"
+add_prop sizeRampLoops "${SIZE_RAMP_LOOPS}"
+add_prop sizeLoopsEveryday "${SIZE_LOOPS_EVERYDAY}"
+add_prop sizeLoopsBusy "${SIZE_LOOPS_BUSY}"
+add_prop sizeLoopsLarge "${SIZE_LOOPS_LARGE}"
+add_prop sizeLoopsXlarge "${SIZE_LOOPS_XLARGE}"
+add_prop sizeLoopsExtreme "${SIZE_LOOPS_EXTREME}"
 add_prop concStepDurationSeconds "${CONC_STEP_DURATION_SECONDS}"
 add_prop concDelay1 "${CONC_DELAY_1}"
 add_prop concDelay2 "${CONC_DELAY_2}"
@@ -271,9 +328,6 @@ add_prop concUsers2 "${CONC_USERS_2}"
 add_prop concUsers5 "${CONC_USERS_5}"
 add_prop concUsers10 "${CONC_USERS_10}"
 add_prop concUsers20 "${CONC_USERS_20}"
-add_prop burstThreads "${BURST_THREADS}"
-add_prop burstDelaySeconds "${BURST_DELAY_SECONDS}"
-add_prop burstDurationSeconds "${BURST_DURATION_SECONDS}"
 
 set -x
 if ! stage_uploads "${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND_PORT}"; then
