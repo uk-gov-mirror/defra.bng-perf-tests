@@ -26,12 +26,14 @@ from the **root** of the results prefix, so one report per task is what it can s
 | --------------------------------- | --------------------- | ------------------------------------------------------------------------- |
 | `Home page`                       | `bng-metric-frontend` | Minimal smoke check against the public home page (`/`), unauthenticated.   |
 | `Project list endpoints`          | `bng-metric-backend`  | BMD-933 — the project list endpoints ship the whole project document.     |
+| `Project creation (typical baseline)` | `bng-metric-backend` | Write-path load on `POST /projects/new` at a realistic baseline size.  |
+| `Project creation (large baseline probe)` | `bng-metric-backend` | One worst-case create, ~810 KB body, just under Hapi's 1 MB cap.  |
 | `Everyday user (background probe)`| both                  | What an ordinary user experiences *while* the upload phases run.          |
 | `Size ramp`                       | `bng-metric-backend`  | Cost of validating one file, across five file sizes.                      |
 | `Concurrency 1/2/5/10/20 user(s)` | `bng-metric-backend`  | Cost as simultaneous uploads increase.                                    |
 
-The first two run **first and alone**, so their numbers are uncontended and mean what
-they did before. The upload phases follow, sequenced by wall clock, with the probe
+The four everyday groups run **first and alone**, so their numbers are uncontended and
+mean what they did before. The upload phases follow, sequenced by wall clock, with the probe
 spanning them. A default run is **290 s — under five minutes**:
 
 ```
@@ -71,7 +73,8 @@ the fix's acceptance criteria as assertions, so it **fails against an unfixed ba
 and passes once the projection + `limit`/`offset` pagination land**:
 
 - **Size Assertion** — each list response stays under `listSizeLimitBytes` regardless
-  of baseline size ("response size is flat regardless of baseline size").
+  of baseline size ("response size is flat regardless of baseline size"). Asserted on
+  the **paginated samplers only** — see [Why AC1 is paginated-only](#why-ac1-is-asserted-on-the-paginated-samplers-only).
 - **Response Assertion** — the payload excludes the document-body-only keys `habitats`
   and `postIntervention` ("list responses exclude the document body").
 - **Response Assertion** — the payload includes the projected `has_baseline` flag.
@@ -88,6 +91,88 @@ differ, e.g. a local stack). `SERVICE_ENDPOINT` still overrides the **backend** 
 back-compat — it no longer touches the frontend group. Do **not** set `SERVICE_ENDPOINT`
 to a frontend host: the list traffic would be sent to the frontend, which does not serve
 those endpoints. Leave it unset and use `FRONTEND_DOMAIN` / `BACKEND_DOMAIN` instead.
+
+### Project creation (write path)
+
+Two thread groups drive `POST /projects/new`. They measure what the read-only list
+groups cannot: Joi validating a baseline parcel by parcel, an ~800 KB JSONB insert, and
+the `write_audit_log` trigger copying the whole document a second time.
+
+Both are scheduled into the **everyday phase** (0 – `EVERYDAY_PHASE_DURATION_SECONDS`)
+alongside the home-page and project-list groups — deliberately not into the quiet
+stretch the upload phases are read against, so they cannot contaminate that baseline.
+
+Bodies are built in-plan by a Groovy JSR223 PreProcessor using the same keys as
+`scripts/seed-via-api.mjs` — the backend's `habitatSchema` rejects unknown keys, so
+every field is one it recognises. Each create gets a fresh name and fresh `featureId`s.
+
+| Group | Profile | Body | Asserts |
+| ----- | ------- | ---- | ------- |
+| typical baseline | `createThreads` × `createLoops` (default 5 × 10 = 50 creates) | `createParcels` habitats (default 25, ~5 KB) | 200, response carries `projectId`, under `createMaxLatencyMs` |
+| large baseline probe | 1 thread × `createLargeLoops` (default 1) | `createLargeParcels` habitats (default 3900, ~810 KB) | 200, response carries `projectId`, under `createLargeMaxLatencyMs` |
+
+#### These groups grow the database permanently
+
+Every create is unreclaimable. The row lands in `bng.projects`, and the
+`write_audit_log` trigger copies the entire document into `bng.audit_log`, which is
+**append-only by design** — the backend's `changelog/db.changelog-1.9.xml` installs
+reject triggers on UPDATE/DELETE/TRUNCATE plus a `REVOKE`. The API exposes no delete
+route, and the CDP perf-test environment persists between runs rather than being torn
+down. So this profile *is* the database growth rate, bounded here at the source rather
+than cleaned up afterwards.
+
+`createParcels` is the dominant lever — bytes written scale linearly with it, and the
+3900-parcel documents the **list** scenario needs are a list fixture, not a realistic
+create. At ~210 bytes per serialised parcel, doubled for the audit copy:
+
+| Profile | Per run | Daily for a year |
+| ------- | ------- | ---------------- |
+| defaults (50 × 25 parcels + 1 × 3900) | ~2.1 MiB | ~750 MiB |
+| 50 creates × 3900 parcels | ~78 MiB | ~28 GiB |
+| `CREATE_THREADS=0`, `CREATE_LARGE_LOOPS=0` | 0 | 0 |
+
+`entrypoint.sh` prints the figure for the configured profile in its run-config banner
+(`create growth: up to ~N KiB added by this run`). It is an upper bound: both groups are
+scheduled, so a slow backend can cut them short of their loop counts.
+
+> **The create groups are not the largest writer in this plan.** The upload phases call
+> `/baseline/validate/{uploadId}` **with a `projectId`**, which runs the full pipeline:
+> the geometry rows for that project are deleted and re-inserted (so those tables stay
+> bounded), but the project document is **updated**, and an update writes an audit row
+> holding *both* the new and the previous document. At the staged fixture sizes
+> (`large` = 5 000 parcels, `xlarge` = 12 000) that is a far bigger contributor to
+> `bng.audit_log` than anything here. See [Upload load profile](#upload-load-profile).
+
+#### Why AC1 is asserted on the paginated samplers only
+
+Created projects carry baselines, so they join the list the BMD-933 group asserts on —
+about 51 new rows per run at the defaults. That matters because a list response's size
+has two factors:
+
+```
+response bytes  ≈  number of rows  ×  bytes per row
+```
+
+The Size Assertion cannot tell them apart. BMD-933 is a *bytes-per-row* regression, but
+on the **unpaginated** samplers the *row count* climbs every run: at ~200 bytes per
+projected row, `listSizeLimitBytes` (256 KB) is reached at ~1,300 projects — roughly 25
+runs. AC1 would then go red on a perfectly projected payload, reading as "the BMD-933
+fix regressed" when the backend is fine and the suite has polluted its own fixture.
+
+So the Size Assertion is attached to `GET /projects?limit&offset` and
+`GET /users/{userId}/projects?limit&offset` only. A 50-row page is 50 rows however many
+projects exist, so it stays a true bytes-per-row check indefinitely — ~7.6 KB post-fix,
+megabytes pre-fix. **Do not add a Size Assertion back to the unpaginated samplers.**
+
+The unpaginated samplers keep AC2 (`habitats`/`postIntervention` excluded), AC3
+(`has_baseline` present) and the Duration Assertion, none of which scale with row count.
+
+#### Seeding stops topping up
+
+`scripts/seed-via-api.mjs` counts baseline-bearing projects, so once the create groups
+have run the owner is permanently above `SEED_PROJECT_COUNT` and the seeder becomes a
+no-op. The five original ~800 KB fixtures persist, so the list group keeps its fat
+documents — but a future change to the fixture shape will not take effect on its own.
 
 ### Upload load profile
 
@@ -318,6 +403,12 @@ override any of the minting inputs if needed:
 | `LIST_THREADS` / `LIST_RAMP_SECONDS` / `LIST_LOOPS` | `10` / `10` / `20`                | Backend (project-list) load profile.                |
 | `HOME_THREADS` / `HOME_RAMP_SECONDS` / `HOME_LOOPS` | `1` / `1` / `5`                   | Frontend (home-page) load profile.                  |
 | `MAX_RESPONSE_MS`       | `2000`                                                        | Home-page per-request time budget.                  |
+| `CREATE_THREADS` / `CREATE_RAMP_SECONDS` / `CREATE_LOOPS` | `5` / `5` / `10`             | Create load profile. `CREATE_THREADS=0` disables the write load. |
+| `CREATE_PARCELS`        | `25`                                                           | Baseline habitats per created project. **Dominant lever on DB growth.** |
+| `CREATE_MAX_LATENCY_MS` | `2000`                                                         | Per-create time budget, typical baseline.           |
+| `CREATE_LARGE_LOOPS`    | `1`                                                            | Worst-case probes per run (1 thread). `0` disables. |
+| `CREATE_LARGE_PARCELS`  | `3900`                                                         | Habitats in the worst-case probe (~810 KB body).    |
+| `CREATE_LARGE_MAX_LATENCY_MS` | `5000`                                                   | Time budget for the worst-case probe.               |
 | `FRONTEND_DOMAIN` / `BACKEND_DOMAIN` | `*.<ENVIRONMENT>.cdp-int.defra.cloud`            | Per-service target hosts.                           |
 | `FRONTEND_PORT` / `BACKEND_PORT` | `SERVICE_PORT` (`443`)                              | Per-service ports; override when the hosts differ.  |
 

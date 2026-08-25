@@ -64,6 +64,44 @@ BACKEND_PORT=${BACKEND_PORT:-${SERVICE_PORT}}
 # SEED_VIA_API=false to skip (e.g. when the target is already seeded).
 SEED_VIA_API=${SEED_VIA_API:-true}
 
+# Write-path (project creation) load for the two "Project creation" thread
+# groups. Every create is permanent: the row lands in bng.projects and the
+# write_audit_log trigger copies the whole document into bng.audit_log, which is
+# append-only (backend changelog/db.changelog-1.9.xml) and cannot be cleared
+# down. The CDP perf-test environment persists between runs, so this profile IS
+# the database growth rate — it is bounded here rather than cleaned up after.
+#
+# CREATE_PARCELS is the dominant lever: bytes written scale linearly with it,
+# and the 3900-parcel documents the LIST scenario needs are a list fixture, not
+# a realistic create. Set CREATE_THREADS=0 to drop the write load entirely, or
+# CREATE_LARGE_LOOPS=0 to drop just the worst-case probe.
+CREATE_THREADS=${CREATE_THREADS:-5}
+CREATE_RAMP_SECONDS=${CREATE_RAMP_SECONDS:-5}
+CREATE_LOOPS=${CREATE_LOOPS:-10}
+CREATE_PARCELS=${CREATE_PARCELS:-25}
+CREATE_MAX_LATENCY_MS=${CREATE_MAX_LATENCY_MS:-2000}
+CREATE_LARGE_LOOPS=${CREATE_LARGE_LOOPS:-1}
+CREATE_LARGE_PARCELS=${CREATE_LARGE_PARCELS:-3900}
+CREATE_LARGE_MAX_LATENCY_MS=${CREATE_LARGE_MAX_LATENCY_MS:-5000}
+
+# Upper bound on the permanent storage the create groups add, so the growth a
+# run causes is visible in the log rather than found later on a disk alarm.
+# ~210 bytes per serialised parcel (measured against the body the plan builds),
+# doubled because the audit trigger stores a full second copy of every document.
+# An UPPER bound: both groups are scheduled into the everyday phase, so a slow
+# backend can cut them short before the loop counts are reached.
+#
+# NOTE this covers the create groups ONLY. The upload phases also write —
+# /baseline/validate with a projectId replaces the geometry rows and UPDATEs the
+# project document, and that update writes an audit row holding BOTH the new and
+# previous document. At the staged fixture sizes that is the larger contributor.
+PARCEL_BYTES=210
+AUDIT_COPIES=2
+BYTES_PER_KIB=1024
+CREATE_PARCELS_TOTAL=$(( CREATE_THREADS * CREATE_LOOPS * CREATE_PARCELS \
+  + CREATE_LARGE_LOOPS * CREATE_LARGE_PARCELS ))
+GROWTH_KIB=$(( CREATE_PARCELS_TOTAL * PARCEL_BYTES * AUDIT_COPIES / BYTES_PER_KIB ))
+
 # The plan's upload phases need real uploads sitting in S3 before JMeter starts,
 # so they measure the validate call and not the uploader. Staging is therefore ON
 # by default. Set STAGE_UPLOADS=false to skip it — the upload thread groups then
@@ -142,6 +180,8 @@ echo "  backend target:      ${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND
 echo "  stub base URL:       ${STUB_BASE_URL}"
 echo "  oidc redirect_uri:   ${OIDC_REDIRECT_URI}"
 echo "  seed via API:        ${SEED_VIA_API} (target ${SEED_PROJECT_COUNT:-5} project(s))"
+echo "  create load:         ${CREATE_THREADS}t x ${CREATE_LOOPS}L x ${CREATE_PARCELS} parcels, plus ${CREATE_LARGE_LOOPS} probe(s) x ${CREATE_LARGE_PARCELS} parcels"
+echo "  create growth:       up to ~${GROWTH_KIB} KiB added by this run (bng.projects + append-only bng.audit_log — NOT reclaimable; excludes upload phases)"
 echo "  nominal run:         ${RUN_END_SECONDS}s"
 echo "  phase schedule:      everyday 0-${EVERYDAY_PHASE_DURATION_SECONDS}s | probe ${PROBE_DELAY_SECONDS}s+${PROBE_DURATION_SECONDS}s | ramp ${SIZE_RAMP_DELAY_SECONDS}s+${SIZE_RAMP_DURATION_SECONDS}s"
 echo "                       conc ${CONC_DELAY_1}/${CONC_DELAY_2}/${CONC_DELAY_5}/${CONC_DELAY_10}/${CONC_DELAY_20}s, ${CONC_STEP_DURATION_SECONDS}s each"
@@ -294,6 +334,14 @@ add_prop listSizeLimitBytes "${LIST_SIZE_LIMIT_BYTES}"
 add_prop listMaxLatencyMs "${LIST_MAX_LATENCY_MS}"
 add_prop limit "${LIST_LIMIT}"
 add_prop offset "${LIST_OFFSET}"
+add_prop createThreads "${CREATE_THREADS}"
+add_prop createRampSeconds "${CREATE_RAMP_SECONDS}"
+add_prop createLoops "${CREATE_LOOPS}"
+add_prop createParcels "${CREATE_PARCELS}"
+add_prop createMaxLatencyMs "${CREATE_MAX_LATENCY_MS}"
+add_prop createLargeLoops "${CREATE_LARGE_LOOPS}"
+add_prop createLargeParcels "${CREATE_LARGE_PARCELS}"
+add_prop createLargeMaxLatencyMs "${CREATE_LARGE_MAX_LATENCY_MS}"
 
 # Upload load profile. The phase tunables are plain pass-throughs; the staged
 # uploadIds are added by stage_uploads itself, which is why it has to run AFTER

@@ -177,6 +177,26 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             <stringProp name="Argument.value">${__P(everydayBudgetMs,5000)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
+          <elementProp name="createParcels" elementType="Argument">
+            <stringProp name="Argument.name">createParcels</stringProp>
+            <stringProp name="Argument.value">${__P(createParcels,25)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="createLargeParcels" elementType="Argument">
+            <stringProp name="Argument.name">createLargeParcels</stringProp>
+            <stringProp name="Argument.value">${__P(createLargeParcels,3900)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="createMaxLatencyMs" elementType="Argument">
+            <stringProp name="Argument.name">createMaxLatencyMs</stringProp>
+            <stringProp name="Argument.value">${__P(createMaxLatencyMs,2000)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="createLargeMaxLatencyMs" elementType="Argument">
+            <stringProp name="Argument.name">createLargeMaxLatencyMs</stringProp>
+            <stringProp name="Argument.value">${__P(createLargeMaxLatencyMs,5000)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
         </collectionProp>
       </elementProp>
     </TestPlan>
@@ -280,12 +300,6 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             <intProp name="Assertion.test_type">8</intProp>
           </ResponseAssertion>
           <hashTree/>
-          <SizeAssertion guiclass="SizeAssertionGui" testclass="SizeAssertion" testname="List payload bounded (BMD-933 AC1)">
-            <stringProp name="Assertion.scope">all</stringProp>
-            <stringProp name="SizeAssertion.size">${listSizeLimitBytes}</stringProp>
-            <intProp name="SizeAssertion.operator">6</intProp>
-          </SizeAssertion>
-          <hashTree/>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Excludes document body (BMD-933 AC2)">
             <collectionProp name="Asserion.test_strings">
               <stringProp name="-802113328">habitats</stringProp>
@@ -368,12 +382,6 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             <boolProp name="Assertion.assume_success">false</boolProp>
             <intProp name="Assertion.test_type">8</intProp>
           </ResponseAssertion>
-          <hashTree/>
-          <SizeAssertion guiclass="SizeAssertionGui" testclass="SizeAssertion" testname="List payload bounded (BMD-933 AC1)">
-            <stringProp name="Assertion.scope">all</stringProp>
-            <stringProp name="SizeAssertion.size">${listSizeLimitBytes}</stringProp>
-            <intProp name="SizeAssertion.operator">6</intProp>
-          </SizeAssertion>
           <hashTree/>
           <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Excludes document body (BMD-933 AC2)">
             <collectionProp name="Asserion.test_strings">
@@ -1254,6 +1262,239 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <hashTree/>
           <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
             <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
+          </DurationAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Project creation (typical baseline)">
+        <stringProp name="TestPlan.comments">Write-path load on POST /projects/new at a REALISTIC baseline size.
+
+Scheduled into the EVERYDAY phase (0-everydayPhaseDurationSeconds) alongside the
+home-page and project-list groups, deliberately NOT into the quiet stretch the
+upload phases are read against.
+
+Every create is permanent: the row lands in bng.projects and the write_audit_log
+trigger copies the whole document into bng.audit_log, which is append-only
+(backend changelog/db.changelog-1.9.xml) and cannot be cleared down. Keep
+createParcels small — it is the dominant lever on bytes written per run.
+Set createThreads=0 to disable the group entirely.</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(createThreads,5)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${__P(createRampSeconds,5)}</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${__P(everydayPhaseDurationSeconds,25)}</stringProp>
+        <stringProp name="ThreadGroup.delay">0</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <stringProp name="LoopController.loops">${__P(createLoops,10)}</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults">
+          <stringProp name="HTTPSampler.domain">${__P(backendDomain,bng-metric-backend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(backendPort,${__P(port,443)})}</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth + JSON headers">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Authorization</stringProp>
+              <stringProp name="Header.value">Bearer ${bearerToken}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Content-Type</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Accept</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /projects/new (typical baseline)">
+          <stringProp name="TestPlan.comments">Concurrent creates at a realistic baseline size (createParcels, default 25 ~= 5 KB).</stringProp>
+          <stringProp name="HTTPSampler.path">/projects/new</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${createBody}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Build project body">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="script">// Build one POST /projects/new body with `parcels` baseline habitats.
+// Keys mirror scripts/seed-via-api.mjs exactly: the backend&apos;s habitatSchema
+// rejects unknown keys, so every key here must be one it recognises.
+// Written with .times{} / .append() so this script contains no XML-special
+// characters and needs no escaping inside the .jmx.
+def parcels = (vars.get(&apos;createParcels&apos;) ?: &apos;25&apos;) as int
+def sb = new StringBuilder(parcels * 210 + 128)
+sb.append(&apos;{&quot;project&quot;:{&quot;name&quot;:&quot;perf-create &apos;)
+  .append(UUID.randomUUID().toString())
+  .append(&apos;&quot;,&quot;baseline&quot;:{&quot;habitats&quot;:[&apos;)
+parcels.times { i -&gt;
+  if (i) { sb.append(&apos;,&apos;) }
+  sb.append(&apos;{&quot;featureId&quot;:&quot;&apos;).append(UUID.randomUUID().toString())
+    .append(&apos;&quot;,&quot;ref&quot;:&quot;perf-&apos;).append(i)
+    .append(&apos;&quot;,&quot;type&quot;:&quot;Mixed scrub&quot;,&quot;broadType&quot;:&quot;Heathland and shrub&quot;,&quot;distinctiveness&quot;:&quot;Medium&quot;,&quot;condition&quot;:&quot;Moderate&quot;,&quot;area&quot;:5000,&quot;status&quot;:&quot;Complete&quot;}&apos;)
+}
+sb.append(&apos;]}}}&apos;)
+vars.put(&apos;createBody&apos;, sb.toString())</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Returns the created projectId">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="-1618432855">projectId</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Create under createMaxLatencyMs">
+            <stringProp name="DurationAssertion.duration">${createMaxLatencyMs}</stringProp>
+          </DurationAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Project creation (large baseline probe)">
+        <stringProp name="TestPlan.comments">ONE create at the worst-case document size, measuring the tail the typical group
+cannot reach: a body just under Hapi&apos;s 1 MB payload cap, Joi-validated parcel by
+parcel, inserted as ~800 KB of JSONB and copied again by the audit trigger —
+~1.6 MB written for a single request.
+
+Deliberately 1 thread x 1 loop. A latency number needs a handful of samples, not a
+soak, and every extra sample costs ~1.6 MB of unreclaimable storage on a persistent
+environment. Set createLargeLoops=0 to skip the probe.</stringProp>
+        <stringProp name="ThreadGroup.num_threads">1</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${__P(everydayPhaseDurationSeconds,25)}</stringProp>
+        <stringProp name="ThreadGroup.delay">0</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <stringProp name="LoopController.loops">${__P(createLargeLoops,1)}</stringProp>
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults">
+          <stringProp name="HTTPSampler.domain">${__P(backendDomain,bng-metric-backend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(backendPort,${__P(port,443)})}</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth + JSON headers">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Authorization</stringProp>
+              <stringProp name="Header.value">Bearer ${bearerToken}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Content-Type</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Accept</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /projects/new (large baseline)">
+          <stringProp name="TestPlan.comments">Worst-case create: createLargeParcels (default 3900) keeps the body just under Hapi&apos;s 1 MB cap.</stringProp>
+          <stringProp name="HTTPSampler.path">/projects/new</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${createBody}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSR223PreProcessor guiclass="TestBeanGUI" testclass="JSR223PreProcessor" testname="Build project body">
+            <stringProp name="scriptLanguage">groovy</stringProp>
+            <stringProp name="parameters"></stringProp>
+            <stringProp name="filename"></stringProp>
+            <stringProp name="cacheKey">true</stringProp>
+            <stringProp name="script">// Build one POST /projects/new body with `parcels` baseline habitats.
+// Keys mirror scripts/seed-via-api.mjs exactly: the backend&apos;s habitatSchema
+// rejects unknown keys, so every key here must be one it recognises.
+// Written with .times{} / .append() so this script contains no XML-special
+// characters and needs no escaping inside the .jmx.
+def parcels = (vars.get(&apos;createLargeParcels&apos;) ?: &apos;25&apos;) as int
+def sb = new StringBuilder(parcels * 210 + 128)
+sb.append(&apos;{&quot;project&quot;:{&quot;name&quot;:&quot;perf-create &apos;)
+  .append(UUID.randomUUID().toString())
+  .append(&apos;&quot;,&quot;baseline&quot;:{&quot;habitats&quot;:[&apos;)
+parcels.times { i -&gt;
+  if (i) { sb.append(&apos;,&apos;) }
+  sb.append(&apos;{&quot;featureId&quot;:&quot;&apos;).append(UUID.randomUUID().toString())
+    .append(&apos;&quot;,&quot;ref&quot;:&quot;perf-&apos;).append(i)
+    .append(&apos;&quot;,&quot;type&quot;:&quot;Mixed scrub&quot;,&quot;broadType&quot;:&quot;Heathland and shrub&quot;,&quot;distinctiveness&quot;:&quot;Medium&quot;,&quot;condition&quot;:&quot;Moderate&quot;,&quot;area&quot;:5000,&quot;status&quot;:&quot;Complete&quot;}&apos;)
+}
+sb.append(&apos;]}}}&apos;)
+vars.put(&apos;createBody&apos;, sb.toString())</stringProp>
+          </JSR223PreProcessor>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Returns the created projectId">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="-1618432855">projectId</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">16</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Create under createLargeMaxLatencyMs">
+            <stringProp name="DurationAssertion.duration">${createLargeMaxLatencyMs}</stringProp>
           </DurationAssertion>
           <hashTree/>
         </hashTree>
