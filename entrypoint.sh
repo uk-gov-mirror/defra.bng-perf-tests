@@ -104,9 +104,13 @@ GROWTH_KIB=$(( CREATE_PARCELS_TOTAL * PARCEL_BYTES * AUDIT_COPIES / BYTES_PER_KI
 
 # The plan's upload phases need real uploads sitting in S3 before JMeter starts,
 # so they measure the validate call and not the uploader. Staging is therefore ON
-# by default. Set STAGE_UPLOADS=false to skip it — the upload thread groups then
-# validate an empty uploadId and report errors, so only do that when you care
-# solely about the home-page and project-list groups.
+# by default. Set STAGE_UPLOADS=false to skip it — every upload phase is then
+# skipped too (see disable_unstaged_phases), leaving the home-page, project-list
+# and project-creation groups plus the probe.
+#
+# Staging is per-size and not all-or-nothing: a size that fails to stage costs
+# its own phase, not the run. Only a total failure — or a failure to build the
+# project pool, which every phase reads its projectId from — gates the task.
 STAGE_UPLOADS=${STAGE_UPLOADS:-true}
 # The backend hands back only the uploader PATH, so the uploader's own host has
 # to be resolved here. Mirrors the backend's own derivation from ENVIRONMENT.
@@ -135,8 +139,53 @@ PROJECTS_CSV=${PROJECTS_CSV:-${JM_HOME}/stage/projects.csv}
 # budget — the groups end when their loops do.
 EVERYDAY_PHASE_DURATION_SECONDS=${EVERYDAY_PHASE_DURATION_SECONDS:-25}
 PROBE_BASELINE_SECONDS=${PROBE_BASELINE_SECONDS:-25}
-SIZE_RAMP_DURATION_SECONDS=${SIZE_RAMP_DURATION_SECONDS:-60}
 CONC_STEP_DURATION_SECONDS=${CONC_STEP_DURATION_SECONDS:-30}
+
+# The size ramp is the one phase that is LOOP-COUNT driven inside a duration
+# guard rather than simply running for its window: it makes a fixed, weighted
+# pass over the four sizes so each one gets an exact sample count. That only
+# holds if the window is big enough for the pass. It was a flat 60s, which the
+# default weights cannot fit — 33 validates, two of them a 9.3 MB file — and the
+# scheduler cuts the group off wherever it has got to. The pass runs smallest
+# first, so what it loses is always the tail: `large` and `xlarge`, the two sizes
+# the ramp exists to characterise, and their rows just quietly stop appearing.
+#
+# So the window is DERIVED from the weights, the same way the delays are derived
+# from the durations: allow each size a per-validate budget, and the window is
+# what that pass adds up to. Change a weight and the window follows it.
+#
+# The allowances below are deliberately generous ORDERS OF MAGNITUDE, not
+# measurements — nobody has a validated latency for a 12 000-parcel file yet.
+# They only set the guard, so a faster service finishes the pass early and the
+# ramp simply ends; the cost of being generous is dead air before the next
+# phase, which is why summarise-run.mjs reports how much of the window the ramp
+# actually used. Tighten them from that number after the first real run.
+SIZE_ALLOWANCE_EVERYDAY_SECONDS=${SIZE_ALLOWANCE_EVERYDAY_SECONDS:-2}
+SIZE_ALLOWANCE_BUSY_SECONDS=${SIZE_ALLOWANCE_BUSY_SECONDS:-4}
+SIZE_ALLOWANCE_LARGE_SECONDS=${SIZE_ALLOWANCE_LARGE_SECONDS:-12}
+SIZE_ALLOWANCE_XLARGE_SECONDS=${SIZE_ALLOWANCE_XLARGE_SECONDS:-26}
+
+# The weights themselves. Defaulted HERE rather than only in the .jmx, because
+# the window derivation needs them; they are still passed through as properties,
+# so the plan's own defaults stay the fallback for a direct JMeter run.
+SIZE_RAMP_THREADS=${SIZE_RAMP_THREADS:-1}
+SIZE_RAMP_LOOPS=${SIZE_RAMP_LOOPS:-1}
+SIZE_LOOPS_EVERYDAY=${SIZE_LOOPS_EVERYDAY:-20}
+SIZE_LOOPS_BUSY=${SIZE_LOOPS_BUSY:-8}
+SIZE_LOOPS_LARGE=${SIZE_LOOPS_LARGE:-3}
+SIZE_LOOPS_XLARGE=${SIZE_LOOPS_XLARGE:-2}
+
+SIZE_RAMP_PASS_SECONDS=$(( SIZE_LOOPS_EVERYDAY * SIZE_ALLOWANCE_EVERYDAY_SECONDS \
+  + SIZE_LOOPS_BUSY * SIZE_ALLOWANCE_BUSY_SECONDS \
+  + SIZE_LOOPS_LARGE * SIZE_ALLOWANCE_LARGE_SECONDS \
+  + SIZE_LOOPS_XLARGE * SIZE_ALLOWANCE_XLARGE_SECONDS ))
+# Threads run the pass concurrently, so they do not lengthen it; loops repeat it.
+# A suppressed phase reserves nothing, rather than leaving a window of dead air
+# that every later phase is pushed out by.
+if [ "${SIZE_RAMP_THREADS}" = "0" ]; then
+  SIZE_RAMP_PASS_SECONDS=0
+fi
+SIZE_RAMP_DURATION_SECONDS=${SIZE_RAMP_DURATION_SECONDS:-$(( SIZE_RAMP_PASS_SECONDS * SIZE_RAMP_LOOPS ))}
 
 # Dead time between phases, so the previous step's in-flight requests drain before
 # the next one starts and its latencies are not charged to the wrong phase.
@@ -185,6 +234,8 @@ echo "  create growth:       up to ~${GROWTH_KIB} KiB added by this run (bng.pro
 echo "  nominal run:         ${RUN_END_SECONDS}s"
 echo "  phase schedule:      everyday 0-${EVERYDAY_PHASE_DURATION_SECONDS}s | probe ${PROBE_DELAY_SECONDS}s+${PROBE_DURATION_SECONDS}s | ramp ${SIZE_RAMP_DELAY_SECONDS}s+${SIZE_RAMP_DURATION_SECONDS}s"
 echo "                       conc ${CONC_DELAY_1}/${CONC_DELAY_2}/${CONC_DELAY_5}/${CONC_DELAY_10}/${CONC_DELAY_20}s, ${CONC_STEP_DURATION_SECONDS}s each"
+echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_EVERYDAY}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (everyday/busy/large/xlarge)"
+echo "                       derived from ${SIZE_ALLOWANCE_EVERYDAY_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
 echo "  stage uploads:       ${STAGE_UPLOADS}"
 if [ "${STAGE_UPLOADS}" = "true" ]; then
   echo "  cdp-uploader:        ${CDP_UPLOADER_URL}"
@@ -276,8 +327,9 @@ stage_uploads() {
     rm -f "${STAGE_OUT}"
     return 1
   fi
-  # Each emitted line is uploadId_<label>=<uuid> (plus parcels_/bytes_ for the
-  # record); turn them into JMeter properties the plan reads.
+  # Each emitted line is uploadId_<label>=<uuid>, one per size that STAGED —
+  # a size that failed emits nothing, which is how disable_unstaged_phases below
+  # knows to skip its phase. Turn them into JMeter properties the plan reads.
   set +x
   while IFS='=' read -r stage_key stage_value; do
     if [ -n "${stage_key}" ]; then
@@ -295,6 +347,48 @@ add_prop() {
   if [ -n "$2" ]; then
     SCENARIO_PROPS="${SCENARIO_PROPS} -J$1=$2"
   fi
+}
+
+# True when stage_uploads captured an uploadId for size label $1.
+staged_upload() {
+  case "${SCENARIO_PROPS}" in
+    *" -JuploadId_$1="*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Zero the loop/thread count of any phase whose staged upload is missing.
+#
+# Without this a size that did not stage (or the whole set, when STAGE_UPLOADS
+# is false) leaves its sampler POSTing to `/baseline/validate/` with an empty
+# path segment: a phase's worth of 404s, recorded and reported exactly as though
+# the service had failed them. Skipping the phase means it is ABSENT from the
+# report rather than lying in it.
+#
+# `large` backs every concurrency phase as well as its own ramp step, so losing
+# it takes the whole concurrency half with it.
+disable_unstaged_phases() {
+  for upload_label in everyday busy large xlarge; do
+    if staged_upload "${upload_label}"; then
+      continue
+    fi
+    echo "▸ no staged upload for '${upload_label}' — skipping its size-ramp step" >&2
+    case "${upload_label}" in
+      everyday) SIZE_LOOPS_EVERYDAY=0 ;;
+      busy) SIZE_LOOPS_BUSY=0 ;;
+      large) SIZE_LOOPS_LARGE=0 ;;
+      xlarge) SIZE_LOOPS_XLARGE=0 ;;
+    esac
+  done
+  if staged_upload large; then
+    return 0
+  fi
+  echo "▸ no staged upload for 'large' — skipping every concurrency phase" >&2
+  CONC_USERS_1=0
+  CONC_USERS_2=0
+  CONC_USERS_5=0
+  CONC_USERS_10=0
+  CONC_USERS_20=0
 }
 
 if [ ! -f "${SCENARIOFILE}" ]; then
@@ -361,21 +455,12 @@ add_prop sizeRampDelaySeconds "${SIZE_RAMP_DELAY_SECONDS}"
 add_prop sizeRampDurationSeconds "${SIZE_RAMP_DURATION_SECONDS}"
 add_prop sizeRampThreads "${SIZE_RAMP_THREADS}"
 add_prop sizeRampLoops "${SIZE_RAMP_LOOPS}"
-add_prop sizeLoopsEveryday "${SIZE_LOOPS_EVERYDAY}"
-add_prop sizeLoopsBusy "${SIZE_LOOPS_BUSY}"
-add_prop sizeLoopsLarge "${SIZE_LOOPS_LARGE}"
-add_prop sizeLoopsXlarge "${SIZE_LOOPS_XLARGE}"
 add_prop concStepDurationSeconds "${CONC_STEP_DURATION_SECONDS}"
 add_prop concDelay1 "${CONC_DELAY_1}"
 add_prop concDelay2 "${CONC_DELAY_2}"
 add_prop concDelay5 "${CONC_DELAY_5}"
 add_prop concDelay10 "${CONC_DELAY_10}"
 add_prop concDelay20 "${CONC_DELAY_20}"
-add_prop concUsers1 "${CONC_USERS_1}"
-add_prop concUsers2 "${CONC_USERS_2}"
-add_prop concUsers5 "${CONC_USERS_5}"
-add_prop concUsers10 "${CONC_USERS_10}"
-add_prop concUsers20 "${CONC_USERS_20}"
 
 set -x
 if ! stage_uploads "${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND_PORT}"; then
@@ -383,6 +468,21 @@ if ! stage_uploads "${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND_PORT}"; 
   exit 1
 fi
 set +x
+
+# The per-phase loop and thread counts are added AFTER staging, because staging
+# is what decides whether a phase has an upload to run against at all. Adding
+# them earlier and overriding later would rely on JMeter's last-duplicate-wins
+# behaviour for repeated -J flags; this way each property is passed exactly once.
+disable_unstaged_phases
+add_prop sizeLoopsEveryday "${SIZE_LOOPS_EVERYDAY}"
+add_prop sizeLoopsBusy "${SIZE_LOOPS_BUSY}"
+add_prop sizeLoopsLarge "${SIZE_LOOPS_LARGE}"
+add_prop sizeLoopsXlarge "${SIZE_LOOPS_XLARGE}"
+add_prop concUsers1 "${CONC_USERS_1}"
+add_prop concUsers2 "${CONC_USERS_2}"
+add_prop concUsers5 "${CONC_USERS_5}"
+add_prop concUsers10 "${CONC_USERS_10}"
+add_prop concUsers20 "${CONC_USERS_20}"
 
 REPORTFILE=${NOW}-perftest-${SCENARIO}-report.csv
 LOGFILE=${JM_LOGS}/perftest-${SCENARIO}.log
@@ -403,9 +503,20 @@ set -x
 # dashboard has the detail; this has the shape — cost by file size, cost by
 # concurrency, and what an ordinary user saw while it happened. It is the thing
 # you paste into a ticket, so a failure to render it must not fail the run.
+#
+# SIZE_RAMP_EXPECTED is what the weighted pass was scheduled to produce, so the
+# summary can say "0 of 2" for a size the window cut off. A truncated ramp is
+# otherwise indistinguishable from one that was never configured: both are just
+# an absent row.
 if [ -f "${REPORTFILE}" ]; then
   set +x
-  node "${JM_HOME}/scripts/summarise-run.mjs" "${REPORTFILE}" || \
+  SIZE_RAMP_EXPECTED="everyday:$(( SIZE_LOOPS_EVERYDAY * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
+  SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},busy:$(( SIZE_LOOPS_BUSY * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
+  SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},large:$(( SIZE_LOOPS_LARGE * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
+  SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},xlarge:$(( SIZE_LOOPS_XLARGE * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
+  SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED}" \
+  SIZE_RAMP_WINDOW_SECONDS="${SIZE_RAMP_DURATION_SECONDS}" \
+    node "${JM_HOME}/scripts/summarise-run.mjs" "${REPORTFILE}" || \
     echo "WARNING: could not summarise ${REPORTFILE}" >&2
   set -x
 fi

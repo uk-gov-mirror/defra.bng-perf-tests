@@ -29,24 +29,29 @@ from the **root** of the results prefix, so one report per task is what it can s
 | `Project creation (typical baseline)` | `bng-metric-backend` | Write-path load on `POST /projects/new` at a realistic baseline size.  |
 | `Project creation (large baseline probe)` | `bng-metric-backend` | One worst-case create, ~810 KB body, just under Hapi's 1 MB cap.  |
 | `Everyday user (background probe)`| both                  | What an ordinary user experiences *while* the upload phases run.          |
-| `Size ramp`                       | `bng-metric-backend`  | Cost of validating one file, across five file sizes.                      |
+| `Size ramp`                       | `bng-metric-backend`  | Cost of validating one file, across four file sizes.                      |
 | `Concurrency 1/2/5/10/20 user(s)` | `bng-metric-backend`  | Cost as simultaneous uploads increase.                                    |
 
 The four everyday groups run **first and alone**, so their numbers are uncontended and
 mean what they did before. The upload phases follow, sequenced by wall clock, with the probe
-spanning them. A default run is **290 s — under five minutes**:
+spanning them. A default run is **390 s — about six and a half minutes**:
 
 ```
-seconds     0    25   55        115  150   185   220   255   290
-home + list |====|
-probe            |==========================================|
-size ramp             |==========|
-1 user                            |====|
-2 users                                 |====|
-5 users                                       |====|
-10 users                                            |====|
-20 users                                                  |====|
+seconds     0  25  55                  215  255 290  325 360 390
+home + list |=|
+probe           |===========================================|
+size ramp          |==================|
+1 user                                  |==|
+2 users                                     |==|
+5 users                                         |==|
+10 users                                             |==|
+20 users                                                 |==|
 ```
+
+Most of that is the size ramp's 160 s window, which is [derived from its
+weights](#the-window-is-derived-from-the-weights-and-a-short-pass-says-so) rather
+than picked: the ramp is loop-count driven, so a window too small for its pass
+does not slow it down, it silently truncates it.
 
 Each group targets its own host (`frontendDomain` / `backendDomain`), and the Bearer
 header is scoped to the backend groups only, so the home-page request is sent
@@ -55,7 +60,7 @@ the upload fixtures are staged once, all before JMeter starts. Assertion failure
 **not** fail the task (the project-list group is red by design until the BMD-933 fix
 lands, and a red Duration Assertion beyond N users *is* the result); only an
 infrastructure failure — a missing plan, a failed token mint, a failed seed, a failed
-staging step, or no report — makes the task exit non-zero.
+staging step that produced *nothing*, or no report — makes the task exit non-zero.
 
 `TEST_SCENARIO` is an escape hatch, not something a normal run sets: `TEST_SCENARIO=<name>`
 runs `scenarios/<name>.jmx` instead, and an unknown name falls back to `bng-perf`, so a
@@ -196,14 +201,15 @@ running **concurrently** with the load can show it. Every phase is scheduled, so
 they run in sequence while the probe spans the whole run:
 
 ```
-seconds    30   55        115  150   185   220   255   290
-probe      |==========================================|
-size ramp       |==========|
-1 user                      |====|
-2 users                           |====|
-5 users                                 |====|
-10 users                                      |====|
-20 users                                            |====|
+seconds     0  25  55                  215  255 290  325 360 390
+home + list |=|
+probe           |===========================================|
+size ramp          |==================|
+1 user                                  |==|
+2 users                                     |==|
+5 users                                         |==|
+10 users                                             |==|
+20 users                                                 |==|
 ```
 
 The 30-55 s stretch, after the probe starts but before any load, is the quiet
@@ -227,12 +233,57 @@ The weights are roughly inverse to file size, so each size takes a comparable
 share of the window and the small ones earn a percentile instead of a single
 point. Because the pass is loop-count driven, those counts are **exact** rather
 than "whatever fitted" — a run either produces 20 `everyday` samples or the
-`SIZE_RAMP_DURATION_SECONDS` guard tripped, which is itself worth knowing.
+`SIZE_RAMP_DURATION_SECONDS` guard tripped.
 
-Set the weights with `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}`, or run
-the whole pass more than once with `SIZE_RAMP_LOOPS`. If you raise them far
-enough to overrun the window, raise `SIZE_RAMP_DURATION_SECONDS` too — the rest
-of the timeline re-derives around it.
+Set the weights with `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}`, or run the whole
+pass more than once with `SIZE_RAMP_LOOPS`.
+
+##### The window is derived from the weights, and a short pass says so
+
+The ramp is the only **loop-count driven** phase — every other one simply runs
+for its window — and that makes its window load-bearing in a way theirs are not.
+If the pass does not fit, the scheduler cuts the thread group off wherever it has
+reached. The pass runs smallest-first, so what it loses is always the **tail**:
+`large` and `xlarge`, the two sizes the ramp exists to characterise. Their rows
+then do not appear at all, which reads exactly like a size that was never
+configured.
+
+So `SIZE_RAMP_DURATION_SECONDS` is not a number to keep in step by hand. It is
+**derived**, like every phase delay: each size gets a per-validate time
+allowance, and the window is what the weighted pass adds up to.
+
+| Allowance                          | Default | Per validate of |
+| ---------------------------------- | ------- | --------------- |
+| `SIZE_ALLOWANCE_EVERYDAY_SECONDS`  | `2`     | 80 parcels      |
+| `SIZE_ALLOWANCE_BUSY_SECONDS`      | `4`     | 800 parcels     |
+| `SIZE_ALLOWANCE_LARGE_SECONDS`     | `12`    | 5 000 parcels   |
+| `SIZE_ALLOWANCE_XLARGE_SECONDS`    | `26`    | 12 000 parcels  |
+
+`20×2 + 8×4 + 3×12 + 2×26` = **160 s**, and the rest of the timeline re-derives
+around it. Raise a weight and the window widens on its own; suppress the phase
+with `SIZE_RAMP_THREADS=0` and it reserves nothing rather than leaving dead air
+every later phase is pushed out by.
+
+Those allowances are deliberately generous **estimates, not measurements** —
+nobody has a validated latency for a 12 000-parcel file yet, and the plan's own
+`validateBudgetMs` red line is 30 s. They only set the guard: a faster service
+finishes the pass early and the ramp ends there. The cost of being generous is
+dead air, which is why every run reports what it actually used:
+
+```
+Did the size ramp complete its pass?
+  size      expected  got
+  everyday  20        20
+  busy      8         8
+  large     3         1  ← CUT OFF
+  xlarge    2         0  ← CUT OFF
+
+  The ramp used 158s of its 160s window (99%).
+```
+
+Tighten the allowances from that number after the first real run. Until then the
+window is sized to be wrong in the direction that costs wall clock rather than
+the direction that costs the result.
 
 #### What it uploads, and why it is generated
 
@@ -292,6 +343,43 @@ virus scan. JMeter then measures only `POST /baseline/validate/{uploadId}`.
 Driving a multipart upload and a polling loop from JMeter would add noise and
 complexity for nothing, and the uploader's scan time is not ours to report on.
 
+##### The size labels are fixed; the sizes are not
+
+`scenarios/bng-perf.jmx` reads `uploadId_everyday`, `uploadId_busy`,
+`uploadId_large` and `uploadId_xlarge` by name — one hard-coded sampler each —
+and every concurrency phase reads `uploadId_large`. So `UPLOAD_SIZES` sets **how
+big each step is**, which is the point of it, but not what the steps are called.
+
+A label the plan does not know would stage a file nothing ever validates; a label
+the plan expects and does not get would leave a phase POSTing to
+`/baseline/validate/` with an empty path segment — a phase's worth of 404s,
+reported exactly as though the service had failed them. Neither is visible as
+anything but bad numbers, so `stage-uploads.mjs` rejects both up front:
+
+```
+stage-uploads failed: UPLOAD_SIZES must name exactly the labels
+scenarios/bng-perf.jmx reads (everyday, busy, large, xlarge) — not in the plan:
+huge. Change the parcel counts, not the labels.
+```
+
+##### A size that does not stage costs its phase, not the run
+
+Staging is per-size, not all-or-nothing. The largest fixture goes through a virus
+scanner on someone else's schedule, and one slow scan should not cost the
+home-page, project-list and project-creation groups — which need no uploads at
+all. So a size that fails to stage emits no `uploadId`, `entrypoint.sh` zeroes
+that phase's loop count, and the phase is **absent** from the report rather than
+lying in it. `large` backs every concurrency phase as well as its own ramp step,
+so losing it takes the concurrency half with it.
+
+Two things still gate the task, because there is no partial run to salvage from
+either: a failure to build the project pool (every phase reads its `projectId`
+from that CSV) and a failure to stage *any* size at all.
+
+This is also what `STAGE_UPLOADS=false` now does — skip staging, and skip
+everything that needed it — rather than running the upload phases against an
+empty `uploadId`.
+
 Staging also creates a **pool of projects**. Validation only runs the full
 pipeline — extract, size, persist — when a `projectId` is supplied; without one
 it stops after the geometry checks and would under-measure the real cost. And
@@ -304,9 +392,13 @@ Staging is on automatically for this plan and off for every other; override with
 #### Reading the result
 
 The task log ends with a plain-English summary (`scripts/summarise-run.mjs`) —
-cost by file size, cost by concurrency, and what the probe saw during each
-phase. That is the part to paste into a ticket; the JMeter dashboard has the
-detail behind it.
+cost by file size, cost by concurrency, whether the size ramp completed its pass,
+and what the probe saw during each phase. That is the part to paste into a
+ticket; the JMeter dashboard has the detail behind it.
+
+Read the ramp-coverage table **first**. Every other number in the summary is a
+latency, and a latency is only meaningful once you know the samples behind it are
+the samples that were asked for.
 
 Assertion failures do **not** gate the task, and a red Duration Assertion beyond
 N users *is* the result rather than a failure. One assertion is different:
@@ -317,8 +409,8 @@ run is meaningless.
 | Env var                          | Default                                        | Purpose                                                        |
 | -------------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
 | `TEST_SCENARIO`                  | `bng-perf`                                     | Escape hatch only — leave unset to run the whole suite.         |
-| `UPLOAD_SIZES`                   | `everyday:80,busy:800,large:5000,xlarge:12000` | `label:parcels` pairs to stage.                                |
-| `STAGE_UPLOADS`                  | `true` for this plan                           | Skip staging (e.g. reusing already-staged uploads).             |
+| `UPLOAD_SIZES`                   | `everyday:80,busy:800,large:5000,xlarge:12000` | How big each step is. `label:parcels` pairs — the **labels are fixed**, see below. |
+| `STAGE_UPLOADS`                  | `true` for this plan                           | `false` skips staging *and* every phase that needed it.         |
 | `CDP_UPLOADER_URL`               | `https://cdp-uploader.<ENVIRONMENT>.cdp-int.defra.cloud` | The uploader to POST staged files to.                 |
 | `PROJECT_POOL_SIZE`              | `40`                                           | Projects to spread concurrent writes across. Keep ≥ max threads. |
 | `UPLOAD_READY_TIMEOUT_MS`        | `180000`                                       | How long to wait for the uploader's scan. Large files are slow. |
@@ -330,7 +422,8 @@ run is meaningless.
 | `VALIDATE_BUDGET_MS`             | `30000`                                        | Latency budget for a validate call under load.                  |
 | `EVERYDAY_BUDGET_MS`             | `5000`                                         | Tighter budget for the everyday-sized file.                     |
 | `VALIDATE_RESPONSE_TIMEOUT_MS`   | `120000`                                       | Socket timeout — above this a sample is an error, not a slow success. |
-| `SIZE_RAMP_DURATION_SECONDS`     | `60`                                           | Guard on the size-ramp pass, and the window the schedule reserves for it. |
+| `SIZE_RAMP_DURATION_SECONDS`     | _derived_ (`160`)                              | Window reserved for the size-ramp pass. Derived from the weights and the allowances below; override and you own it. |
+| `SIZE_ALLOWANCE_{EVERYDAY,BUSY,LARGE,XLARGE}_SECONDS` | `2/4/12/26`               | Time allowed per validate of each size. This is what the window is derived from. |
 | `SIZE_RAMP_THREADS`              | `1`                                            | Users on the size ramp. `0` suppresses the phase — see below.    |
 | `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the four sizes.                            |
 | `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}` | `20/8/3/2`                            | Samples per size in a pass. Weighted so small files earn a percentile. |
@@ -339,15 +432,15 @@ run is meaningless.
 | `CONC_DELAY_{1,2,5,10,20}`       | _derived_                                      | When each concurrency step starts.                              |
 | `CONC_USERS_{1,2,5,10,20}`       | `1/2/5/10/20`                                  | Threads at each step.                                           |
 
-**Running only the everyday half.** Every upload phase's thread count is a
-property, so setting them all to `0` suppresses that half of the plan and leaves
-the home-page and project-list groups — a ~25 s run with nothing in it that needs
-staged uploads. Useful locally when you are working on the list endpoints rather
-than on upload:
+**Running only the everyday half.** `STAGE_UPLOADS=false` is enough on its own:
+with no staged uploads there are no `uploadId`s, and every phase that needed one
+is skipped. Add `PROBE_THREADS=0` and `SIZE_RAMP_THREADS=0` to collapse the
+schedule as well, so the run ends when the everyday groups do (~25 s) instead of
+waiting out a window nothing is running in. Useful locally when you are working
+on the list endpoints rather than on upload:
 
 ```sh
 STAGE_UPLOADS=false PROBE_THREADS=0 SIZE_RAMP_THREADS=0 \
-CONC_USERS_1=0 CONC_USERS_2=0 CONC_USERS_5=0 CONC_USERS_10=0 CONC_USERS_20=0 \
 docker compose up --build
 ```
 
