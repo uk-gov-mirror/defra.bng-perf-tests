@@ -1,0 +1,20 @@
+{
+  "name": "bng-perf-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JMeter performance-test suite for the BNG Metric service, run from the CDP Portal.",
+  "license": "OGL-UK-3.0",
+  "engines": {
+    "node": ">=22.11"
+  },
+  "scripts": {
+    "gpkg": "node scripts/make-gpkg.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3",
+    "bng-library": "github:DEFRA/bng-library#af307d543e0dd0a1e6d1fe9a90496d63beedc2c3",
+    "csv-parse": "^7.0.2",
+    "xlsx": "^0.18.5"
+  }
+}

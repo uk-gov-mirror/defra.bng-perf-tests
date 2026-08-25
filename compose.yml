@@ -21,9 +21,11 @@
 #   SERVICE_URL_SCHEME=https ENVIRONMENT=dev \
 #   docker compose up --build
 #
-# LocalStack stands in for S3 so the entrypoint's results-publish step succeeds
-# (it exits non-zero if RESULTS_OUTPUT_S3_PATH is unset); reports also land in
-# ./reports on the host.
+# LocalStack stands in for S3 so the entrypoint's results-publish step has somewhere
+# to publish to, mirroring what a CDP task does. It is NOT required: with
+# RESULTS_OUTPUT_S3_PATH unset the entrypoint logs "skipping S3 publish" and exits 0.
+# Reports land in ./reports on the host either way, so drop both this service and
+# RESULTS_OUTPUT_S3_PATH if you only want the run and the report.
 services:
   development:
     build: .
@@ -55,6 +57,13 @@ services:
       FRONTEND_PORT: ${FRONTEND_PORT:-3000}
       BACKEND_PORT: ${BACKEND_PORT:-3001}
       STUB_BASE_URL: ${STUB_BASE_URL:-http://host.docker.internal:3200/cdp-defra-id-stub}
+      # Upload staging POSTs the fixtures to the CDP Uploader, which runs in the
+      # backend's compose on the HOST. entrypoint.sh defaults this to
+      # localhost:7337 when ENVIRONMENT=local, which is right for a process on the
+      # host and wrong from inside this container — there localhost is the
+      # container itself, and staging fails the run. Point it at the host like
+      # every other target above.
+      CDP_UPLOADER_URL: ${CDP_UPLOADER_URL:-http://host.docker.internal:7337}
       SERVICE_URL_SCHEME: ${SERVICE_URL_SCHEME:-http}
     networks:
       - performance-tests
