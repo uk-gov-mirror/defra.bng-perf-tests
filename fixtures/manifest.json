@@ -1,0 +1,28 @@
+{
+  "sizes": [
+    {
+      "label": "everyday",
+      "parcels": 80,
+      "file": "baseline-everyday.gpkg",
+      "bytes": 143360
+    },
+    {
+      "label": "busy",
+      "parcels": 800,
+      "file": "baseline-busy.gpkg",
+      "bytes": 720896
+    },
+    {
+      "label": "large",
+      "parcels": 5000,
+      "file": "baseline-large.gpkg",
+      "bytes": 4108288
+    },
+    {
+      "label": "xlarge",
+      "parcels": 12000,
+      "file": "baseline-xlarge.gpkg",
+      "bytes": 9732096
+    }
+  ]
+}

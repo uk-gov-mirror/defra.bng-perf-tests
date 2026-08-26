@@ -2,11 +2,11 @@
  * Prepare everything the upload scenarios need, before JMeter starts.
  *
  * The upload journey is four steps — initiate, POST the file to the CDP
- * Uploader, poll until it is ready, then validate. Only the last of those is
- * worth measuring under load; the first three are the uploader's work, not the
- * service's, and driving a multipart upload plus a polling loop from JMeter
- * would add noise and complexity for nothing. So this stages the uploads here,
- * in Node, and hands JMeter a set of ready `uploadId`s to hammer.
+ * Uploader, wait until it is scanned, then validate. The validate-only phases
+ * isolate the service's own cost, so their uploads are staged here, in Node,
+ * and JMeter is handed a set of ready `uploadId`s to hammer. (The journey
+ * phases measure all four steps end-to-end — they drive their own uploads from
+ * the plan and need nothing staged beyond the project pool.)
  *
  * It also creates a pool of projects. Validation only runs the full pipeline —
  * extract, size, persist — when a `projectId` is supplied; without one it stops
@@ -23,7 +23,7 @@
  * property channel. Plus a projects CSV written to disk for JMeter's CSV Data
  * Set.
  */
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { makeGeoPackage } from './make-gpkg.mjs'
@@ -38,6 +38,8 @@ const CDP_UPLOADER_URL = process.env.CDP_UPLOADER_URL
 // becomes a 0 ms deadline, an empty PROJECT_POOL_SIZE a pool of none. This is
 // the same guard seed-via-api.mjs's `positiveIntEnv` applies for the same reason.
 const STAGE_DIR = process.env.STAGE_DIR || '/opt/perftest/stage'
+const FIXTURES_DIR =
+  process.env.FIXTURES_DIR || join(import.meta.dirname, '..', 'fixtures')
 const PROJECTS_CSV = process.env.PROJECTS_CSV || join(STAGE_DIR, 'projects.csv')
 const S3_BUCKET = process.env.UPLOAD_S3_BUCKET || 'baseline-files'
 
@@ -226,16 +228,47 @@ async function waitForReady(uploadId) {
   )
 }
 
-async function stageOneSize({ label, parcels }) {
-  const filePath = join(STAGE_DIR, `baseline-${label}.gpkg`)
-  const { bytes, generationMs } = makeGeoPackage(filePath, parcels)
-  // Generation time is logged because it is super-linear in parcel count and
-  // is pure setup cost — a task that looks slow to start is usually the top of
-  // the size ramp being built, not the service being slow.
-  process.stderr.write(
-    `▸ ${label}: ${parcels} parcels, ${(bytes / 1024).toFixed(0)} KB ` +
-      `(generated in ${(generationMs / 1000).toFixed(1)}s) — uploading\n`
+/**
+ * The committed fixture for a size, when there is one. fixtures/manifest.json
+ * (written by gen-fixtures.mjs) is matched on label AND parcel count, so a
+ * UPLOAD_SIZES override that changes a count simply falls back to generating —
+ * the fast path never uploads a file of the wrong size under the right name.
+ */
+function committedFixture({ label, parcels }) {
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(join(FIXTURES_DIR, 'manifest.json')))
+  } catch {
+    return null
+  }
+  const entry = manifest.sizes?.find(
+    (s) => s.label === label && s.parcels === parcels
   )
+  return entry ? { path: join(FIXTURES_DIR, entry.file), bytes: entry.bytes } : null
+}
+
+async function stageOneSize({ label, parcels }) {
+  const fixture = committedFixture({ label, parcels })
+  let filePath
+  let bytes
+  if (fixture) {
+    ;({ path: filePath, bytes } = fixture)
+    process.stderr.write(
+      `▸ ${label}: ${parcels} parcels, ${(bytes / 1024).toFixed(0)} KB ` +
+        `(committed fixture) — uploading\n`
+    )
+  } else {
+    filePath = join(STAGE_DIR, `baseline-${label}.gpkg`)
+    let generationMs
+    ;({ bytes, generationMs } = makeGeoPackage(filePath, parcels))
+    // Generation time is logged because it is super-linear in parcel count and
+    // is pure setup cost — a task that looks slow to start is usually the top
+    // of the size ramp being built, not the service being slow.
+    process.stderr.write(
+      `▸ ${label}: ${parcels} parcels, ${(bytes / 1024).toFixed(0)} KB ` +
+        `(generated in ${(generationMs / 1000).toFixed(1)}s) — uploading\n`
+    )
+  }
 
   try {
     const { uploadId, uploadUrl } = await initiateUpload()
@@ -244,10 +277,13 @@ async function stageOneSize({ label, parcels }) {
     process.stderr.write(`  ready: ${uploadId}\n`)
     return { label, parcels, bytes, uploadId }
   } finally {
-    // The staged file has served its purpose either way — on success the bytes
-    // now live in S3, and on failure a 9 MB scratch file has no reason to sit
-    // in the container for the rest of the run.
-    rmSync(filePath, { force: true })
+    // A generated file has served its purpose either way — on success the
+    // bytes now live in S3, and on failure a 9 MB scratch file has no reason
+    // to sit in the container for the rest of the run. Committed fixtures are
+    // repo files and stay put.
+    if (!fixture) {
+      rmSync(filePath, { force: true })
+    }
   }
 }
 

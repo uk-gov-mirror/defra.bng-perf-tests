@@ -17,8 +17,9 @@
  *   generateOne                 — writes a *synthetic* file (baseline + proposed)
  *   deriveBaselineFromSynthetic — clears the proposed columns to leave a baseline
  *
- * Generated per run rather than committed, so any size can be asked for via
- * UPLOAD_SIZES without putting tens of MB of binaries in git.
+ * The default sizes are committed as fixtures/ (see gen-fixtures.mjs); this
+ * remains the generator behind them, and the run-time fallback for any other
+ * size asked for via UPLOAD_SIZES.
  */
 import { rmSync, statSync } from 'node:fs'
 import { generateOne, deriveBaselineFromSynthetic, setMode } from 'bng-library'
