@@ -543,7 +543,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe: a bystander's project list (GET /projects)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe: project list under load (GET /projects)">
           <stringProp name="HTTPSampler.path">/projects</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -570,7 +570,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </DurationAssertion>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe: a bystander's home page (GET /)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe: home page under load (GET /)">
           <stringProp name="HTTPSampler.domain">${__P(frontendDomain,bng-metric-frontend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
           <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
           <stringProp name="HTTPSampler.port">${__P(frontendPort,${__P(port,443)})}</stringProp>

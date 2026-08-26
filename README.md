@@ -195,7 +195,7 @@ They are built to answer five questions, in the order a PM asks them:
 | At what file size does it become a problem?       | the rest of the size ramp      |
 | At what concurrency does it become a problem?     | `validate large file @ N user(s)`   |
 | What does the whole journey cost end to end?      | `journey: * @ N user(s)`        |
-| **What does an ordinary user experience meanwhile?** | `probe: a bystander's project list`       |
+| **What does an ordinary user experience meanwhile?** | `probe: project list under load`       |
 
 The last one is the point of the plan. Uploads getting slower under upload load
 is expected and mostly affects the person uploading. An unrelated project list

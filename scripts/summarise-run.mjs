@@ -333,7 +333,7 @@ function journeyTotals(samples) {
  */
 function collateralImpact(samples) {
   const probes = samples.filter(
-    (s) => s.label === "probe: a bystander's project list (GET /projects)"
+    (s) => s.label === 'probe: project list under load (GET /projects)'
   )
   if (probes.length === 0) {
     return null
