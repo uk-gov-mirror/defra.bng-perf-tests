@@ -46,8 +46,17 @@ UPLOAD LOAD, which answers three questions a PM asks in this order:
      "whatever fitted"; sizeRampDurationSeconds is a guard against a slow backend, and
      the window the schedule reserves for the phase.
   5. When do MANY big files become a problem? -&gt; "Concurrency ramp"
+  6. What does the WHOLE journey cost end to end? -&gt; "Upload journey"
 
-and, running alongside all of it, a fourth that matters more than any of them:
+     The staircases above replay a PRE-STAGED upload, so they measure the
+     service&apos;s validate cost in isolation. The journey groups instead drive a
+     real upload per iteration — initiate, multipart POST to the CDP Uploader,
+     validate — at 1/2/5 concurrent users, so the uploader and its virus scan
+     are inside the measurement. The backend&apos;s validate route waits for the
+     scan itself, so no client-side polling is needed; the &quot;validate+scan&quot; leg
+     carries that wait, as a frontend user would experience it.
+
+and, running alongside all of it, one that matters more than any of them:
 
   6. What does an ORDINARY user experience while that is happening?
      -&gt; "Everyday user (background probe)"
@@ -59,17 +68,18 @@ starts AFTER the everyday groups finish, so the quiet stretch before the size ra
 is a genuine baseline to compare the loaded phases against.
 
 Shape of the run. Every group is scheduled, so the phases run in sequence while
-the probe spans the upload half. Nominal run is 390s:
+the probe spans the upload half. Nominal run is 495s:
 
-              seconds 0  25  55                  215  255 290  325 360 390
+              seconds 0  25  55                  215  255 290  325 360   395 430 465 495
   home + list         |=|
-  probe                   |===========================================|
+  probe                   |=============================================================|
   size ramp                  |==================|
   1 user                                          |==|
   2 users                                             |==|
   5 users                                                 |==|
   10 users                                                     |==|
   20 users                                                         |==|
+  journey 1/2/5                                                          |==| |==| |==|
 
 The stretch between the probe starting and the size ramp (30-55s here) is quiet
 by construction: it is the baseline every loaded phase is read against.
@@ -115,7 +125,7 @@ Runtime properties (all overridable with -J..., wired from env vars in entrypoin
                                    /baseline/validate/ with an empty path segment.
   projectsCsv                      path to the staged project id pool
   probeDelaySeconds                when the probe starts (default 30)
-  probeDurationSeconds             how long the background probe runs (default 360)
+  probeDurationSeconds             how long the background probe runs (default 465)
   probeThinkMs / probeMaxLatencyMs probe pacing and its latency budget
   validateBudgetMs                 latency budget for a validate call (default 30000)
   sizeRamp* / conc*                per-phase delay, duration and thread counts
@@ -125,6 +135,19 @@ Runtime properties (all overridable with -J..., wired from env vars in entrypoin
   sizeRampLoops                    weighted passes over the size ramp (default 1)
   sizeLoops&lt;Size&gt;                  samples per size in a pass (default 20/8/3/2). The
                                    ramp window must fit them — entrypoint.sh derives it.
+  journeyUsers1/2/5 / journeyDelay1/2/5 / journeyStepDurationSeconds
+                                   the upload-journey staircase (defaults 1/2/5 users,
+                                   30s per step, scheduled after the concurrency ramp).
+                                   Set a journeyUsers* to 0 to suppress that step.
+  journeyFile                      the file each journey iteration uploads (default the
+                                   committed everyday fixture)
+  journeyBudgetMs                  latency budget for the validate+scan leg (default 20000)
+  uploaderUrl                      the CDP Uploader base URL — the backend returns only
+                                   the upload PATH, so the plan needs the host too
+  uploadS3Bucket                   destination bucket for /upload/initiate. MUST be a
+                                   bucket the environment&apos;s cdp-uploader may write to
+                                   (its CONSUMER_BUCKETS); default is the local stack&apos;s
+                                   baseline-files
 
 Phase delays are ABSOLUTE seconds from the start of the run, so every duration change
 has to be propagated to every later phase. Do NOT do that by hand: entrypoint.sh
@@ -207,6 +230,26 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <elementProp name="createLargeMaxLatencyMs" elementType="Argument">
             <stringProp name="Argument.name">createLargeMaxLatencyMs</stringProp>
             <stringProp name="Argument.value">${__P(createLargeMaxLatencyMs,5000)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="journeyBudgetMs" elementType="Argument">
+            <stringProp name="Argument.name">journeyBudgetMs</stringProp>
+            <stringProp name="Argument.value">${__P(journeyBudgetMs,20000)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="uploaderUrl" elementType="Argument">
+            <stringProp name="Argument.name">uploaderUrl</stringProp>
+            <stringProp name="Argument.value">${__P(uploaderUrl,http://localhost:7337)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="journeyFile" elementType="Argument">
+            <stringProp name="Argument.name">journeyFile</stringProp>
+            <stringProp name="Argument.value">${__P(journeyFile,/opt/perftest/fixtures/baseline-everyday.gpkg)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="uploadS3Bucket" elementType="Argument">
+            <stringProp name="Argument.name">uploadS3Bucket</stringProp>
+            <stringProp name="Argument.value">${__P(uploadS3Bucket,baseline-files)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
         </collectionProp>
@@ -464,7 +507,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
         <stringProp name="ThreadGroup.num_threads">${__P(probeThreads,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(probeDurationSeconds,360)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(probeDurationSeconds,465)}</stringProp>
         <stringProp name="ThreadGroup.delay">${__P(probeDelaySeconds,30)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
@@ -1276,6 +1319,600 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             <stringProp name="DurationAssertion.duration">${validateBudgetMs}</stringProp>
           </DurationAssertion>
           <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey 1 user(s) — everyday file">
+        <stringProp name="TestPlan.comments">The FULL upload journey — initiate, multipart POST to the CDP Uploader, then
+validate — as one closed loop per user, so the report shows what an upload
+costs END TO END, where the validate-only staircase isolates the service&apos;s
+own cost. Each iteration is a real new upload of the committed everyday
+fixture (journeyFile), so the uploader and its virus scanner are inside the
+measurement.
+
+There is no client-side scan poll: the backend&apos;s validate route waits for
+the scan itself (waitForUploadReady), so the &quot;validate+scan&quot; leg carries the
+scan wait — the same wall-clock a user at the frontend experiences, without
+a polling loop&apos;s noise in the report.</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(journeyUsers1,1)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${__P(journeyStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(journeyDelay1,395)}</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <stringProp name="LoopController.loops">-1</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="Backend defaults">
+          <stringProp name="HTTPSampler.domain">${__P(backendDomain,bng-metric-backend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(backendPort,${__P(port,443)})}</stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth headers (no Content-Type — the multipart sampler must set its own)">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Authorization</stringProp>
+              <stringProp name="Header.value">Bearer ${bearerToken}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Accept</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Project id pool">
+          <stringProp name="filename">${__P(projectsCsv,/opt/perftest/stage/projects.csv)}</stringProp>
+          <stringProp name="variableNames">projectId</stringProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">true</boolProp>
+          <boolProp name="stopThread">false</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+          <boolProp name="ignoreFirstLine">false</boolProp>
+          <stringProp name="fileEncoding"></stringProp>
+        </CSVDataSet>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey initiate @ 1 user(s)">
+          <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+          <stringProp name="HTTPSampler.response_timeout">30000</stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{&quot;redirect&quot;:&quot;/done&quot;,&quot;s3Bucket&quot;:&quot;${uploadS3Bucket}&quot;,&quot;s3Path&quot;:&quot;baseline/&quot;}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON body">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="extract uploadId + uploadUrl">
+            <stringProp name="JSONPostProcessor.referenceNames">journeyUploadId;journeyUploadUrl</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.uploadId;$.uploadUrl</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1;1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">FAILED;FAILED</stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="initiate succeeded?">
+          <stringProp name="IfController.condition">${__jexl3(&quot;${journeyUploadId}&quot; != &quot;FAILED&quot;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey upload @ 1 user(s)">
+            <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
+uploaderUrl. A successful upload answers 302 to the redirect target; the
+redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
+            <stringProp name="HTTPSampler.path">${uploaderUrl}${journeyUploadUrl}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">120000</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
+              <collectionProp name="HTTPFileArgs.files">
+                <elementProp name="${journeyFile}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile}</stringProp>
+                  <stringProp name="File.paramname">file</stringProp>
+                  <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Uploader redirects on success">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="50549">302</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey validate+scan @ 1 user(s)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON body">
+              <collectionProp name="HeaderManager.headers">
+                <elementProp name="" elementType="Header">
+                  <stringProp name="Header.name">Content-Type</stringProp>
+                  <stringProp name="Header.value">application/json</stringProp>
+                </elementProp>
+              </collectionProp>
+            </HeaderManager>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${journeyBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey 2 user(s) — everyday file">
+        <stringProp name="TestPlan.comments">The FULL upload journey — initiate, multipart POST to the CDP Uploader, then
+validate — as one closed loop per user, so the report shows what an upload
+costs END TO END, where the validate-only staircase isolates the service&apos;s
+own cost. Each iteration is a real new upload of the committed everyday
+fixture (journeyFile), so the uploader and its virus scanner are inside the
+measurement.
+
+There is no client-side scan poll: the backend&apos;s validate route waits for
+the scan itself (waitForUploadReady), so the &quot;validate+scan&quot; leg carries the
+scan wait — the same wall-clock a user at the frontend experiences, without
+a polling loop&apos;s noise in the report.</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(journeyUsers2,2)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${__P(journeyStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(journeyDelay2,430)}</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <stringProp name="LoopController.loops">-1</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="Backend defaults">
+          <stringProp name="HTTPSampler.domain">${__P(backendDomain,bng-metric-backend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(backendPort,${__P(port,443)})}</stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth headers (no Content-Type — the multipart sampler must set its own)">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Authorization</stringProp>
+              <stringProp name="Header.value">Bearer ${bearerToken}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Accept</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Project id pool">
+          <stringProp name="filename">${__P(projectsCsv,/opt/perftest/stage/projects.csv)}</stringProp>
+          <stringProp name="variableNames">projectId</stringProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">true</boolProp>
+          <boolProp name="stopThread">false</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+          <boolProp name="ignoreFirstLine">false</boolProp>
+          <stringProp name="fileEncoding"></stringProp>
+        </CSVDataSet>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey initiate @ 2 user(s)">
+          <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+          <stringProp name="HTTPSampler.response_timeout">30000</stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{&quot;redirect&quot;:&quot;/done&quot;,&quot;s3Bucket&quot;:&quot;${uploadS3Bucket}&quot;,&quot;s3Path&quot;:&quot;baseline/&quot;}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON body">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="extract uploadId + uploadUrl">
+            <stringProp name="JSONPostProcessor.referenceNames">journeyUploadId;journeyUploadUrl</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.uploadId;$.uploadUrl</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1;1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">FAILED;FAILED</stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="initiate succeeded?">
+          <stringProp name="IfController.condition">${__jexl3(&quot;${journeyUploadId}&quot; != &quot;FAILED&quot;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey upload @ 2 user(s)">
+            <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
+uploaderUrl. A successful upload answers 302 to the redirect target; the
+redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
+            <stringProp name="HTTPSampler.path">${uploaderUrl}${journeyUploadUrl}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">120000</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
+              <collectionProp name="HTTPFileArgs.files">
+                <elementProp name="${journeyFile}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile}</stringProp>
+                  <stringProp name="File.paramname">file</stringProp>
+                  <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Uploader redirects on success">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="50549">302</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey validate+scan @ 2 user(s)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON body">
+              <collectionProp name="HeaderManager.headers">
+                <elementProp name="" elementType="Header">
+                  <stringProp name="Header.name">Content-Type</stringProp>
+                  <stringProp name="Header.value">application/json</stringProp>
+                </elementProp>
+              </collectionProp>
+            </HeaderManager>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${journeyBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
+        </hashTree>
+      </hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey 5 user(s) — everyday file">
+        <stringProp name="TestPlan.comments">The FULL upload journey — initiate, multipart POST to the CDP Uploader, then
+validate — as one closed loop per user, so the report shows what an upload
+costs END TO END, where the validate-only staircase isolates the service&apos;s
+own cost. Each iteration is a real new upload of the committed everyday
+fixture (journeyFile), so the uploader and its virus scanner are inside the
+measurement.
+
+There is no client-side scan poll: the backend&apos;s validate route waits for
+the scan itself (waitForUploadReady), so the &quot;validate+scan&quot; leg carries the
+scan wait — the same wall-clock a user at the frontend experiences, without
+a polling loop&apos;s noise in the report.</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(journeyUsers5,5)}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">1</stringProp>
+        <boolProp name="ThreadGroup.scheduler">true</boolProp>
+        <stringProp name="ThreadGroup.duration">${__P(journeyStepDurationSeconds,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(journeyDelay5,465)}</stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
+          <stringProp name="LoopController.loops">-1</stringProp>
+          <boolProp name="LoopController.continue_forever">true</boolProp>
+        </elementProp>
+      </ThreadGroup>
+      <hashTree>
+        <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="Backend defaults">
+          <stringProp name="HTTPSampler.domain">${__P(backendDomain,bng-metric-backend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
+          <stringProp name="HTTPSampler.port">${__P(backendPort,${__P(port,443)})}</stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+        </ConfigTestElement>
+        <hashTree/>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="Auth headers (no Content-Type — the multipart sampler must set its own)">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Authorization</stringProp>
+              <stringProp name="Header.value">Bearer ${bearerToken}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Accept</stringProp>
+              <stringProp name="Header.value">application/json</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Project id pool">
+          <stringProp name="filename">${__P(projectsCsv,/opt/perftest/stage/projects.csv)}</stringProp>
+          <stringProp name="variableNames">projectId</stringProp>
+          <stringProp name="delimiter">,</stringProp>
+          <boolProp name="quotedData">false</boolProp>
+          <boolProp name="recycle">true</boolProp>
+          <boolProp name="stopThread">false</boolProp>
+          <stringProp name="shareMode">shareMode.all</stringProp>
+          <boolProp name="ignoreFirstLine">false</boolProp>
+          <stringProp name="fileEncoding"></stringProp>
+        </CSVDataSet>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey initiate @ 5 user(s)">
+          <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+          <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+          <stringProp name="HTTPSampler.response_timeout">30000</stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">{&quot;redirect&quot;:&quot;/done&quot;,&quot;s3Bucket&quot;:&quot;${uploadS3Bucket}&quot;,&quot;s3Path&quot;:&quot;baseline/&quot;}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON body">
+            <collectionProp name="HeaderManager.headers">
+              <elementProp name="" elementType="Header">
+                <stringProp name="Header.name">Content-Type</stringProp>
+                <stringProp name="Header.value">application/json</stringProp>
+              </elementProp>
+            </collectionProp>
+          </HeaderManager>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="extract uploadId + uploadUrl">
+            <stringProp name="JSONPostProcessor.referenceNames">journeyUploadId;journeyUploadUrl</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.uploadId;$.uploadUrl</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1;1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">FAILED;FAILED</stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+          <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+            <collectionProp name="Asserion.test_strings">
+              <stringProp name="49586">200</stringProp>
+            </collectionProp>
+            <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+            <boolProp name="Assertion.assume_success">false</boolProp>
+            <intProp name="Assertion.test_type">8</intProp>
+          </ResponseAssertion>
+          <hashTree/>
+        </hashTree>
+        <IfController guiclass="IfControllerPanel" testclass="IfController" testname="initiate succeeded?">
+          <stringProp name="IfController.condition">${__jexl3(&quot;${journeyUploadId}&quot; != &quot;FAILED&quot;)}</stringProp>
+          <boolProp name="IfController.evaluateAll">false</boolProp>
+          <boolProp name="IfController.useExpression">true</boolProp>
+        </IfController>
+        <hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey upload @ 5 user(s)">
+            <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
+uploaderUrl. A successful upload answers 302 to the redirect target; the
+redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
+            <stringProp name="HTTPSampler.path">${uploaderUrl}${journeyUploadUrl}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">false</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.DO_MULTIPART_POST">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">120000</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments"/>
+            </elementProp>
+            <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
+              <collectionProp name="HTTPFileArgs.files">
+                <elementProp name="${journeyFile}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile}</stringProp>
+                  <stringProp name="File.paramname">file</stringProp>
+                  <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Uploader redirects on success">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="50549">302</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+          </hashTree>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey validate+scan @ 5 user(s)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
+            <stringProp name="HTTPSampler.method">POST</stringProp>
+            <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+            <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+            <boolProp name="HTTPSampler.postBodyRaw">true</boolProp>
+            <stringProp name="HTTPSampler.connect_timeout">10000</stringProp>
+            <stringProp name="HTTPSampler.response_timeout">${__P(validateResponseTimeoutMs,120000)}</stringProp>
+            <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+              <collectionProp name="Arguments.arguments">
+                <elementProp name="" elementType="HTTPArgument">
+                  <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                  <stringProp name="Argument.value">{&quot;projectId&quot;:&quot;${projectId}&quot;}</stringProp>
+                  <stringProp name="Argument.metadata">=</stringProp>
+                </elementProp>
+              </collectionProp>
+            </elementProp>
+          </HTTPSamplerProxy>
+          <hashTree>
+            <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="JSON body">
+              <collectionProp name="HeaderManager.headers">
+                <elementProp name="" elementType="Header">
+                  <stringProp name="Header.name">Content-Type</stringProp>
+                  <stringProp name="Header.value">application/json</stringProp>
+                </elementProp>
+              </collectionProp>
+            </HeaderManager>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Status 200">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="49586">200</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_code</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">8</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <ResponseAssertion guiclass="AssertionGui" testclass="ResponseAssertion" testname="Fixture actually validates">
+              <collectionProp name="Asserion.test_strings">
+                <stringProp name="-1">&quot;valid&quot;:true</stringProp>
+              </collectionProp>
+              <stringProp name="Assertion.test_field">Assertion.response_data</stringProp>
+              <boolProp name="Assertion.assume_success">false</boolProp>
+              <intProp name="Assertion.test_type">2</intProp>
+            </ResponseAssertion>
+            <hashTree/>
+            <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
+              <stringProp name="DurationAssertion.duration">${journeyBudgetMs}</stringProp>
+            </DurationAssertion>
+            <hashTree/>
+          </hashTree>
         </hashTree>
       </hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Project creation (typical baseline)">

@@ -62,6 +62,7 @@ function readSamples(path) {
       ts: Number(r.timeStamp),
       elapsed: Number(r.elapsed),
       label: r.label,
+      thread: r.threadName,
       ok: r.success === 'true'
     }))
     // A truncated final row has no label; drop it rather than letting it skew a
@@ -120,7 +121,10 @@ function isSizeRamp(label) {
   return label.startsWith('validate ') && label.endsWith('(1 user)')
 }
 function isConcurrency(label) {
-  return label.includes('@') && label.includes('user(s)')
+  return label.startsWith('validate ') && label.includes('user(s)')
+}
+function isJourney(label) {
+  return label.startsWith('journey ')
 }
 
 // The order the size labels are meant to be read in. A ramp presented out of
@@ -255,6 +259,71 @@ function rampCoverageNotes({ short, windowSeconds, usedSeconds }) {
 }
 
 /**
+ * End-to-end times for the upload-journey staircase.
+ *
+ * Each journey iteration is three sequential samples on one thread — initiate,
+ * upload, validate+scan — so the per-leg rows understate what a user actually
+ * waits. This reconstructs each iteration from the thread name: an initiate
+ * opens it, the next validate+scan on the same thread closes it, and the
+ * end-to-end time is last-byte minus first-byte across the triple. An
+ * iteration whose initiate failed never opens (the plan skips its other legs),
+ * and one cut off by the window's end never closes — both simply don't count.
+ */
+function journeyTotals(samples) {
+  const byStep = new Map()
+  for (const s of samples) {
+    const m = /^journey (\S+) @ (\d+) user\(s\)$/.exec(s.label)
+    if (!m) {
+      continue
+    }
+    const users = Number(m[2])
+    if (!byStep.has(users)) {
+      byStep.set(users, new Map())
+    }
+    const byThread = byStep.get(users)
+    if (!byThread.has(s.thread)) {
+      byThread.set(s.thread, [])
+    }
+    byThread.get(s.thread).push({ ...s, leg: m[1] })
+  }
+
+  const rows = []
+  for (const [users, byThread] of [...byStep.entries()].sort(([a], [b]) => a - b)) {
+    const totals = []
+    for (const legs of byThread.values()) {
+      legs.sort((a, b) => a.ts - b.ts)
+      let open = null
+      for (const leg of legs) {
+        if (leg.leg === 'initiate') {
+          open = leg
+        } else if (leg.leg.startsWith('validate') && open) {
+          totals.push({
+            ts: open.ts,
+            elapsed: leg.ts + leg.elapsed - open.ts,
+            ok: leg.ok,
+            label: 'journey'
+          })
+          open = null
+        }
+      }
+    }
+    if (totals.length === 0) {
+      continue
+    }
+    const s = stats(totals)
+    rows.push([
+      `end to end @ ${users} user(s)`,
+      s.count,
+      fmtMs(s.mean),
+      fmtMs(s.p95),
+      fmtMs(s.max),
+      `${s.failedPct}%`
+    ])
+  }
+  return rows
+}
+
+/**
  * What the background probe saw while each upload phase was running.
  *
  * This is the number that decides whether heavy uploads are merely slow for the
@@ -272,7 +341,15 @@ function collateralImpact(samples) {
     if (isProbe(s.label)) {
       continue
     }
-    const phase = isSizeRamp(s.label) ? 'size ramp' : s.label
+    // Journey legs collapse to one phase per step — three separate "during"
+    // rows for one staircase step would triple-count the same window.
+    const journeyStep = /^journey \S+ (@ \d+ user\(s\))$/.exec(s.label)
+    let phase = s.label
+    if (isSizeRamp(s.label)) {
+      phase = 'size ramp'
+    } else if (journeyStep) {
+      phase = `upload journey ${journeyStep[1]}`
+    }
     const window = phases.get(phase) ?? { from: Infinity, to: -Infinity }
     window.from = Math.min(window.from, s.ts)
     window.to = Math.max(window.to, s.ts + s.elapsed)
@@ -325,7 +402,8 @@ function main() {
 
   const groups = [
     ['How long does one upload take, by file size?', isSizeRamp],
-    ['What happens as more people upload at once?', isConcurrency]
+    ['What happens as more people upload at once?', isConcurrency],
+    ['What does the full journey cost (initiate + upload + scan + validate)?', isJourney]
   ]
   for (const [title, predicate] of groups) {
     const byLabel = summariseGroup(samples, predicate)
@@ -337,6 +415,9 @@ function main() {
       const s = stats(group)
       return [label, s.count, fmtMs(s.mean), fmtMs(s.p95), fmtMs(s.max), `${s.failedPct}%`]
     })
+    if (predicate === isJourney) {
+      rows.push(...journeyTotals(samples))
+    }
     out.push(table(rows, ['', 'n', 'mean', 'p95', 'worst', 'failed']))
   }
 
