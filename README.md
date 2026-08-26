@@ -31,21 +31,23 @@ from the **root** of the results prefix, so one report per task is what it can s
 | `Everyday user (background probe)`| both                  | What an ordinary user experiences *while* the upload phases run.          |
 | `Size ramp`                       | `bng-metric-backend`  | Cost of validating one file, across four file sizes.                      |
 | `Concurrency 1/2/5/10/20 user(s)` | `bng-metric-backend`  | Cost as simultaneous uploads increase.                                    |
+| `Upload journey 1/2/5 user(s)`    | backend + cdp-uploader | The full journey — initiate, multipart upload, scan, validate — end to end. |
 
 The four everyday groups run **first and alone**, so their numbers are uncontended and
 mean what they did before. The upload phases follow, sequenced by wall clock, with the probe
-spanning them. A default run is **390 s — about six and a half minutes**:
+spanning them. A default run is **495 s — about eight minutes**:
 
 ```
-seconds     0  25  55                  215  255 290  325 360 390
+seconds     0  25  55                  215  255 290  325 360   395 430 465 495
 home + list |=|
-probe           |===========================================|
+probe           |=============================================================|
 size ramp          |==================|
 1 user                                  |==|
 2 users                                     |==|
 5 users                                         |==|
 10 users                                             |==|
 20 users                                                 |==|
+journey                                                        |==| |==| |==|
 ```
 
 Most of that is the size ramp's 160 s window, which is [derived from its
@@ -185,14 +187,15 @@ The upload phases of the plan profile the **upload and validate** journey. They 
 after the home-page and project-list groups have finished, so neither set of numbers
 contaminates the other.
 
-They are built to answer four questions, in the order a PM asks them:
+They are built to answer five questions, in the order a PM asks them:
 
 | Question                                          | Where the answer is            |
 | ------------------------------------------------- | ------------------------------ |
-| What does an everyday upload cost?                | `validate everyday (1 user)`   |
+| What does an everyday upload cost?                | `validate everyday file (1 user)`   |
 | At what file size does it become a problem?       | the rest of the size ramp      |
-| At what concurrency does it become a problem?     | `validate large @ N user(s)`   |
-| **What does an ordinary user experience meanwhile?** | `probe GET /projects`       |
+| At what concurrency does it become a problem?     | `validate large file @ N user(s)`   |
+| What does the whole journey cost end to end?      | `journey: * @ N user(s)`        |
+| **What does an ordinary user experience meanwhile?** | `probe: project list under load`       |
 
 The last one is the point of the plan. Uploads getting slower under upload load
 is expected and mostly affects the person uploading. An unrelated project list
@@ -201,15 +204,16 @@ running **concurrently** with the load can show it. Every phase is scheduled, so
 they run in sequence while the probe spans the whole run:
 
 ```
-seconds     0  25  55                  215  255 290  325 360 390
+seconds     0  25  55                  215  255 290  325 360   395 430 465 495
 home + list |=|
-probe           |===========================================|
+probe           |=============================================================|
 size ramp          |==================|
 1 user                                  |==|
 2 users                                     |==|
 5 users                                         |==|
 10 users                                             |==|
 20 users                                                 |==|
+journey                                                        |==| |==| |==|
 ```
 
 The 30-55 s stretch, after the probe starts but before any load, is the quiet
@@ -221,7 +225,7 @@ The ramp runs a single user through a **fixed, weighted pass** — 20 `everyday`
 8 `busy`, 3 `large`, 2 `xlarge` — rather than looping all four evenly until the
 clock runs out.
 
-One user is deliberate: `validate everyday (1 user)` only means "what an
+One user is deliberate: `validate everyday file (1 user)` only means "what an
 everyday upload costs" if nothing else is hitting the service while it is
 measured, which is why each size does **not** get its own thread. But an even
 pass has a flaw — every size shares a sample count with the slowest one, because
@@ -285,7 +289,7 @@ Tighten the allowances from that number after the first real run. Until then the
 window is sized to be wrong in the direction that costs wall clock rather than
 the direction that costs the result.
 
-#### What it uploads, and why it is generated
+#### What it uploads, and where the fixtures come from
 
 `scripts/make-gpkg.mjs` builds a valid baseline GeoPackage of any size by
 driving [`bng-library`](https://github.com/DEFRA/bng-library) — the same
@@ -309,11 +313,21 @@ Generation is seeded on the parcel count, so a rerun of the same size produces a
 byte-identical file — two runs that disagree are a change in the service, not a
 change in the fixture.
 
-Files are generated per run rather than committed, so any size can be asked for
-via `UPLOAD_SIZES` without putting tens of MB of binaries in git. The cost is
-that `bng-library` and its `better-sqlite3` / `xlsx` peers are baked into the
-image at build time (see the `Dockerfile`); the CDP task pulls a finished image
-and needs no access to GitHub or the npm registry.
+The four default sizes are **committed** under `fixtures/` (with a
+`manifest.json` recording each file's label, parcel count and size), because
+generation is super-linear in parcel count — `xlarge` alone costs ~30 s in the
+CDP container — and a committed file doubles as a stable artefact for ad-hoc
+upload tests against any environment. Regenerate them with `npm run
+gen-fixtures` after changing a size or bumping the `bng-library` pin; being
+seeded, an unchanged generator reproduces them byte-for-byte, so a diff on the
+binaries means the generator changed.
+
+`stage-uploads.mjs` matches each requested size against the manifest by label
+**and** parcel count, so a non-default `UPLOAD_SIZES` still works — that size is
+simply generated at run time as before. This is why `bng-library` and its
+`better-sqlite3` / `xlsx` peers stay baked into the image at build time (see the
+`Dockerfile`); the CDP task pulls a finished image and needs no access to GitHub
+or the npm registry.
 
 For scale: real BNG files in the reference corpus top out around **80 parcels /
 124 KB**, which is what `everyday` reproduces. The larger steps exist to find
@@ -337,11 +351,23 @@ start is identifiable as setup.
 
 #### Staging: what is measured and what is not
 
-`scripts/stage-uploads.mjs` runs before JMeter and does the parts that are *not*
-the service's work — initiate, POST the file to the CDP Uploader, wait for the
-virus scan. JMeter then measures only `POST /baseline/validate/{uploadId}`.
-Driving a multipart upload and a polling loop from JMeter would add noise and
-complexity for nothing, and the uploader's scan time is not ours to report on.
+`scripts/stage-uploads.mjs` runs before JMeter and does the parts the
+**validate-only** phases deliberately exclude — initiate, POST the file to the
+CDP Uploader, wait for the virus scan. The size ramp and the concurrency
+staircase then measure only `POST /baseline/validate/{uploadId}`, so their
+numbers isolate the service's own cost from the uploader's.
+
+The **upload journey** phases are the deliberate exception: each iteration
+drives a real upload from the plan — initiate, multipart POST of the committed
+`everyday` fixture (`JOURNEY_FILE` to override), then validate — at 1/2/5
+concurrent users, so the uploader and its scan are inside the measurement.
+There is still no client-side polling loop: the backend's validate route waits
+for the scan itself, so the `journey: validate incl virus scan` leg carries that wait, the
+same wall-clock a frontend user experiences. The summary reconstructs true
+end-to-end times per iteration from the thread name, and reports each leg
+alongside them. Note the journey needs `UPLOAD_S3_BUCKET` to name a bucket the
+environment's cdp-uploader may write to (its `CONSUMER_BUCKETS`) — the same
+requirement staging has.
 
 ##### The size labels are fixed; the sizes are not
 

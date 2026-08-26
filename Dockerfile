@@ -8,7 +8,8 @@ WORKDIR /opt/perftest
 USER root
 RUN apk add --no-cache nodejs
 
-# The upload scenarios generate their GeoPackage fixtures at run time with
+# The default GeoPackage fixtures are committed (fixtures/), but any
+# non-default UPLOAD_SIZES entry is still generated at run time with
 # bng-library (scripts/make-gpkg.mjs), so its dependencies must be baked in.
 # npm and git are build-time only — git because bng-library is pinned to a
 # GitHub SHA rather than published to a registry — so they are installed as a
@@ -31,6 +32,7 @@ RUN apk add --no-cache --virtual .build-deps npm git \
 
 COPY scenarios/ ./scenarios/
 COPY scripts/ ./scripts/
+COPY fixtures/ ./fixtures/
 COPY entrypoint.sh .
 COPY user.properties .
 

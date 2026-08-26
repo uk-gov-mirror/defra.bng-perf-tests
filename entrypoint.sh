@@ -209,9 +209,25 @@ CONC_DELAY_10=${CONC_DELAY_10:-${PHASE_CURSOR}}
 PHASE_CURSOR=$((CONC_DELAY_10 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
 CONC_DELAY_20=${CONC_DELAY_20:-${PHASE_CURSOR}}
 
+# The upload-journey staircase: a real upload per iteration — initiate,
+# multipart POST to the CDP Uploader, validate — so the uploader and its virus
+# scan are measured end to end, where the validate staircase above replays a
+# pre-staged upload to isolate the service's own cost. Scheduled after the
+# concurrency ramp; each step's users all drive the everyday-sized fixture.
+JOURNEY_STEP_DURATION_SECONDS=${JOURNEY_STEP_DURATION_SECONDS:-30}
+JOURNEY_USERS_1=${JOURNEY_USERS_1:-1}
+JOURNEY_USERS_2=${JOURNEY_USERS_2:-2}
+JOURNEY_USERS_5=${JOURNEY_USERS_5:-5}
+PHASE_CURSOR=$((CONC_DELAY_20 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+JOURNEY_DELAY_1=${JOURNEY_DELAY_1:-${PHASE_CURSOR}}
+PHASE_CURSOR=$((JOURNEY_DELAY_1 + JOURNEY_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+JOURNEY_DELAY_2=${JOURNEY_DELAY_2:-${PHASE_CURSOR}}
+PHASE_CURSOR=$((JOURNEY_DELAY_2 + JOURNEY_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+JOURNEY_DELAY_5=${JOURNEY_DELAY_5:-${PHASE_CURSOR}}
+
 # The probe has to outlive the last phase or the tail of the run is unobserved —
 # which is exactly where an availability problem would show up.
-RUN_END_SECONDS=$((CONC_DELAY_20 + CONC_STEP_DURATION_SECONDS))
+RUN_END_SECONDS=$((JOURNEY_DELAY_5 + JOURNEY_STEP_DURATION_SECONDS))
 PROBE_DURATION_SECONDS=${PROBE_DURATION_SECONDS:-$((RUN_END_SECONDS - PROBE_DELAY_SECONDS))}
 
 # One-shot run-config banner. xtrace off so it reads as a clean block and so no
@@ -234,6 +250,7 @@ echo "  create growth:       up to ~${GROWTH_KIB} KiB added by this run (bng.pro
 echo "  nominal run:         ${RUN_END_SECONDS}s"
 echo "  phase schedule:      everyday 0-${EVERYDAY_PHASE_DURATION_SECONDS}s | probe ${PROBE_DELAY_SECONDS}s+${PROBE_DURATION_SECONDS}s | ramp ${SIZE_RAMP_DELAY_SECONDS}s+${SIZE_RAMP_DURATION_SECONDS}s"
 echo "                       conc ${CONC_DELAY_1}/${CONC_DELAY_2}/${CONC_DELAY_5}/${CONC_DELAY_10}/${CONC_DELAY_20}s, ${CONC_STEP_DURATION_SECONDS}s each"
+echo "                       journey ${JOURNEY_DELAY_1}/${JOURNEY_DELAY_2}/${JOURNEY_DELAY_5}s at ${JOURNEY_USERS_1}/${JOURNEY_USERS_2}/${JOURNEY_USERS_5} user(s), ${JOURNEY_STEP_DURATION_SECONDS}s each"
 echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_EVERYDAY}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (everyday/busy/large/xlarge)"
 echo "                       derived from ${SIZE_ALLOWANCE_EVERYDAY_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
 echo "  stage uploads:       ${STAGE_UPLOADS}"
@@ -368,6 +385,15 @@ staged_upload() {
 # `large` backs every concurrency phase as well as its own ramp step, so losing
 # it takes the whole concurrency half with it.
 disable_unstaged_phases() {
+  # The journey phases need no staged uploadId — each iteration uploads its own
+  # file — but they DO need the project pool staging builds and an uploader to
+  # POST to, so STAGE_UPLOADS=false suppresses them along with everything else.
+  if [ "${STAGE_UPLOADS}" != "true" ]; then
+    echo "▸ STAGE_UPLOADS is not true — skipping the upload-journey phases" >&2
+    JOURNEY_USERS_1=0
+    JOURNEY_USERS_2=0
+    JOURNEY_USERS_5=0
+  fi
   for upload_label in everyday busy large xlarge; do
     if staged_upload "${upload_label}"; then
       continue
@@ -462,6 +488,19 @@ add_prop concDelay5 "${CONC_DELAY_5}"
 add_prop concDelay10 "${CONC_DELAY_10}"
 add_prop concDelay20 "${CONC_DELAY_20}"
 
+# The upload-journey staircase. uploaderUrl because the backend returns only
+# the upload PATH; uploadS3Bucket because /upload/initiate requires the caller
+# to name a bucket the environment's cdp-uploader may write to — the same
+# UPLOAD_S3_BUCKET staging itself uses.
+add_prop uploaderUrl "${CDP_UPLOADER_URL}"
+add_prop uploadS3Bucket "${UPLOAD_S3_BUCKET}"
+add_prop journeyFile "${JOURNEY_FILE}"
+add_prop journeyBudgetMs "${JOURNEY_BUDGET_MS}"
+add_prop journeyStepDurationSeconds "${JOURNEY_STEP_DURATION_SECONDS}"
+add_prop journeyDelay1 "${JOURNEY_DELAY_1}"
+add_prop journeyDelay2 "${JOURNEY_DELAY_2}"
+add_prop journeyDelay5 "${JOURNEY_DELAY_5}"
+
 set -x
 if ! stage_uploads "${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND_PORT}"; then
   echo "ERROR: upload staging failed — cannot run ${SCENARIO}" >&2
@@ -483,6 +522,9 @@ add_prop concUsers2 "${CONC_USERS_2}"
 add_prop concUsers5 "${CONC_USERS_5}"
 add_prop concUsers10 "${CONC_USERS_10}"
 add_prop concUsers20 "${CONC_USERS_20}"
+add_prop journeyUsers1 "${JOURNEY_USERS_1}"
+add_prop journeyUsers2 "${JOURNEY_USERS_2}"
+add_prop journeyUsers5 "${JOURNEY_USERS_5}"
 
 REPORTFILE=${NOW}-perftest-${SCENARIO}-report.csv
 LOGFILE=${JM_LOGS}/perftest-${SCENARIO}.log
