@@ -218,6 +218,18 @@ function postWithHostHeader(url, hostHeader, body) {
   });
 }
 
+/**
+ * Exchange the authorization code for tokens at the stub's /token endpoint
+ * (PKCE: the code_verifier proves we started the authorize hop).
+ *
+ * When STUB_ISSUER_HOST is set the POST goes via node:http with that Host
+ * header, pinning the `iss` the stub stamps into the token; otherwise a plain
+ * fetch. Exits the process via fail() on a non-2xx response.
+ *
+ * @param {string} code authorization code returned on the redirect back
+ * @param {string} verifier PKCE code_verifier matching the challenge sent
+ * @returns {Promise<object>} token response ({ id_token, access_token, … })
+ */
 async function exchangeCode(code, verifier) {
   const body = new URLSearchParams({
     grant_type: "authorization_code",
