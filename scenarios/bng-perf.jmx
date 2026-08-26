@@ -270,7 +270,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
         </elementProp>
       </ThreadGroup>
       <hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET / (home page)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="frontend home page loads (GET /)">
           <stringProp name="HTTPSampler.domain">${__P(frontendDomain,bng-metric-frontend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
           <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
           <stringProp name="HTTPSampler.port">${__P(frontendPort,${__P(port,443)})}</stringProp>
@@ -337,7 +337,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /users/{userId}/projects">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="list a user's projects (GET /users/{userId}/projects)">
           <stringProp name="HTTPSampler.path">/users/${userId}/projects</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
@@ -379,7 +379,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </DurationAssertion>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /users/{userId}/projects?limit&amp;offset">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="list a user's projects, paginated (GET /users/{userId}/projects?limit&amp;offset)">
           <stringProp name="HTTPSampler.path">/users/${userId}/projects</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
@@ -420,7 +420,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </SizeAssertion>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /projects">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="list my projects (GET /projects)">
           <stringProp name="HTTPSampler.path">/projects</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
@@ -462,7 +462,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </DurationAssertion>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="GET /projects?limit&amp;offset">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="list my projects, paginated (GET /projects?limit&amp;offset)">
           <stringProp name="HTTPSampler.path">/projects</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.postBodyRaw">false</boolProp>
@@ -543,7 +543,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe GET /projects">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe: a bystander's project list (GET /projects)">
           <stringProp name="HTTPSampler.path">/projects</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -570,7 +570,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           </DurationAssertion>
           <hashTree/>
         </hashTree>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe GET / (frontend home)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="probe: a bystander's home page (GET /)">
           <stringProp name="HTTPSampler.domain">${__P(frontendDomain,bng-metric-frontend.${__P(env)}.cdp-int.defra.cloud)}</stringProp>
           <stringProp name="HTTPSampler.protocol">${__P(protocol,https)}</stringProp>
           <stringProp name="HTTPSampler.port">${__P(frontendPort,${__P(port,443)})}</stringProp>
@@ -658,7 +658,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate everyday (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate everyday file (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_everyday,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -706,7 +706,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate busy (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate busy file (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_busy,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -754,7 +754,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -802,7 +802,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate xlarge (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate xlarge file (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -898,7 +898,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large @ 1 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file @ 1 user(s)">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -993,7 +993,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large @ 2 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file @ 2 user(s)">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1088,7 +1088,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large @ 5 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file @ 5 user(s)">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1183,7 +1183,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large @ 10 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file @ 10 user(s)">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1278,7 +1278,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large @ 20 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file @ 20 user(s)">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1380,7 +1380,7 @@ a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey initiate @ 1 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: initiate upload @ 1 user(s)">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1431,7 +1431,7 @@ a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey upload @ 1 user(s)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: send file to uploader @ 1 user(s)">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1466,7 +1466,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey validate+scan @ 1 user(s)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: validate incl virus scan @ 1 user(s)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1578,7 +1578,7 @@ a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey initiate @ 2 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: initiate upload @ 2 user(s)">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1629,7 +1629,7 @@ a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey upload @ 2 user(s)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: send file to uploader @ 2 user(s)">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1664,7 +1664,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey validate+scan @ 2 user(s)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: validate incl virus scan @ 2 user(s)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1776,7 +1776,7 @@ a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey initiate @ 5 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: initiate upload @ 5 user(s)">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1827,7 +1827,7 @@ a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey upload @ 5 user(s)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: send file to uploader @ 5 user(s)">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1862,7 +1862,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey validate+scan @ 5 user(s)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey: validate incl virus scan @ 5 user(s)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1968,7 +1968,7 @@ Set createThreads=0 to disable the group entirely.</stringProp>
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /projects/new (typical baseline)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="create a typical project (POST /projects/new)">
           <stringProp name="TestPlan.comments">Concurrent creates at a realistic baseline size (createParcels, default 25 ~= 5 KB).</stringProp>
           <stringProp name="HTTPSampler.path">/projects/new</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
@@ -2083,7 +2083,7 @@ environment. Set createLargeLoops=0 to skip the probe.</stringProp>
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="POST /projects/new (large baseline)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="create a worst-case ~800 KB project (POST /projects/new)">
           <stringProp name="TestPlan.comments">Worst-case create: createLargeParcels (default 3900) keeps the body just under Hapi&apos;s 1 MB cap.</stringProp>
           <stringProp name="HTTPSampler.path">/projects/new</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>

@@ -191,11 +191,11 @@ They are built to answer five questions, in the order a PM asks them:
 
 | Question                                          | Where the answer is            |
 | ------------------------------------------------- | ------------------------------ |
-| What does an everyday upload cost?                | `validate everyday (1 user)`   |
+| What does an everyday upload cost?                | `validate everyday file (1 user)`   |
 | At what file size does it become a problem?       | the rest of the size ramp      |
-| At what concurrency does it become a problem?     | `validate large @ N user(s)`   |
-| What does the whole journey cost end to end?      | `journey * @ N user(s)`        |
-| **What does an ordinary user experience meanwhile?** | `probe GET /projects`       |
+| At what concurrency does it become a problem?     | `validate large file @ N user(s)`   |
+| What does the whole journey cost end to end?      | `journey: * @ N user(s)`        |
+| **What does an ordinary user experience meanwhile?** | `probe: a bystander's project list`       |
 
 The last one is the point of the plan. Uploads getting slower under upload load
 is expected and mostly affects the person uploading. An unrelated project list
@@ -225,7 +225,7 @@ The ramp runs a single user through a **fixed, weighted pass** — 20 `everyday`
 8 `busy`, 3 `large`, 2 `xlarge` — rather than looping all four evenly until the
 clock runs out.
 
-One user is deliberate: `validate everyday (1 user)` only means "what an
+One user is deliberate: `validate everyday file (1 user)` only means "what an
 everyday upload costs" if nothing else is hitting the service while it is
 measured, which is why each size does **not** get its own thread. But an even
 pass has a flaw — every size shares a sample count with the slowest one, because
@@ -362,7 +362,7 @@ drives a real upload from the plan — initiate, multipart POST of the committed
 `everyday` fixture (`JOURNEY_FILE` to override), then validate — at 1/2/5
 concurrent users, so the uploader and its scan are inside the measurement.
 There is still no client-side polling loop: the backend's validate route waits
-for the scan itself, so the `journey validate+scan` leg carries that wait, the
+for the scan itself, so the `journey: validate incl virus scan` leg carries that wait, the
 same wall-clock a frontend user experiences. The summary reconstructs true
 end-to-end times per iteration from the thread name, and reports each leg
 alongside them. Note the journey needs `UPLOAD_S3_BUCKET` to name a bucket the

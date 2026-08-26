@@ -115,7 +115,7 @@ function section(title) {
 
 /** Labels grouped by the phase they belong to. */
 function isProbe(label) {
-  return label.startsWith('probe ')
+  return label.startsWith('probe')
 }
 function isSizeRamp(label) {
   return label.startsWith('validate ') && label.endsWith('(1 user)')
@@ -124,7 +124,7 @@ function isConcurrency(label) {
   return label.startsWith('validate ') && label.includes('user(s)')
 }
 function isJourney(label) {
-  return label.startsWith('journey ')
+  return label.startsWith('journey')
 }
 
 // The order the size labels are meant to be read in. A ramp presented out of
@@ -206,7 +206,7 @@ function rampCoverage(samples) {
   let short = false
   for (const { size, count } of expected) {
     // Same label shape isSizeRamp and sortKey already rely on.
-    const got = counts.get(`validate ${size} (1 user)`) ?? 0
+    const got = counts.get(`validate ${size} file (1 user)`) ?? 0
     const complete = got >= count
     short = short || !complete
     rows.push([size, count, complete ? got : `${got}  ← CUT OFF`])
@@ -272,7 +272,7 @@ function rampCoverageNotes({ short, windowSeconds, usedSeconds }) {
 function journeyTotals(samples) {
   const byStep = new Map()
   for (const s of samples) {
-    const m = /^journey (\S+) @ (\d+) user\(s\)$/.exec(s.label)
+    const m = /^journey: (.+) @ (\d+) user\(s\)$/.exec(s.label)
     if (!m) {
       continue
     }
@@ -294,7 +294,7 @@ function journeyTotals(samples) {
       legs.sort((a, b) => a.ts - b.ts)
       let open = null
       for (const leg of legs) {
-        if (leg.leg === 'initiate') {
+        if (leg.leg.startsWith('initiate')) {
           open = leg
         } else if (leg.leg.startsWith('validate') && open) {
           totals.push({
@@ -332,7 +332,9 @@ function journeyTotals(samples) {
  * is directly comparable to the same page load when nothing else is happening.
  */
 function collateralImpact(samples) {
-  const probes = samples.filter((s) => s.label === 'probe GET /projects')
+  const probes = samples.filter(
+    (s) => s.label === "probe: a bystander's project list (GET /projects)"
+  )
   if (probes.length === 0) {
     return null
   }
@@ -343,7 +345,7 @@ function collateralImpact(samples) {
     }
     // Journey legs collapse to one phase per step — three separate "during"
     // rows for one staircase step would triple-count the same window.
-    const journeyStep = /^journey \S+ (@ \d+ user\(s\))$/.exec(s.label)
+    const journeyStep = /^journey: .+ (@ \d+ user\(s\))$/.exec(s.label)
     let phase = s.label
     if (isSizeRamp(s.label)) {
       phase = 'size ramp'
