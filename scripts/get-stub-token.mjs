@@ -17,6 +17,8 @@
 //
 // Usage:  node scripts/get-stub-token.mjs   (id_token -> stdout, `sub=` -> stderr)
 import { createHash, randomBytes } from "node:crypto";
+import http from "node:http";
+import https from "node:https";
 
 // Progress goes to stderr; stdout carries ONLY the token so entrypoint.sh can
 // capture it with a command substitution.
@@ -182,20 +184,76 @@ async function followToCode(startUrl, jar, expectedState) {
   return null;
 }
 
-async function exchangeCode(code, verifier) {
-  const res = await fetch(`${STUB}/token`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: verifier,
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-    }).toString(),
+// The stub stamps the token's `iss` from the Host header of the /token request
+// (scheme from its appBaseUrl + the request's host), while the backend expects
+// whatever issuer its own discovery fetch named. When the two reach the stub by
+// different names — a containerised run minting via host.docker.internal against
+// a backend that discovered via localhost — the issuers disagree and the backend
+// rejects every token. STUB_ISSUER_HOST forces the Host header on this one hop
+// so the minted issuer matches the backend's expectation; `fetch` silently
+// strips a spoofed `host` header, hence the drop to node:http for it. Unset
+// (the CDP case, where everything shares one stub URL), the exchange is a plain
+// fetch and behaviour is unchanged.
+const ISSUER_HOST = process.env.STUB_ISSUER_HOST ?? "";
+
+function postWithHostHeader(url, hostHeader, body) {
+  const target = new URL(url);
+  const client = target.protocol === "https:" ? https : http;
+  return new Promise((resolve, reject) => {
+    const req = client.request(
+      target,
+      {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded", host: hostHeader },
+      },
+      (res) => {
+        let text = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => (text += chunk));
+        res.on("end", () => resolve({ ok: res.statusCode < 300, status: res.statusCode, text }));
+      },
+    );
+    req.on("error", reject);
+    req.end(body);
   });
-  const text = await res.text();
+}
+
+/**
+ * The last step of the login dance: trade the one-time code the stub gave us
+ * for the actual token. The verifier proves this is the same client that
+ * started the login, so nobody who intercepted the code can cash it in.
+ *
+ * The stub copies this request's Host header into the token's issuer, and the
+ * backend rejects tokens whose issuer it doesn't recognise — so when
+ * STUB_ISSUER_HOST is set we send the request with that Host header instead of
+ * our own. Stops the whole process if the stub says no.
+ *
+ * @param {string} code one-time code from the login redirect
+ * @param {string} verifier secret that matches the challenge sent at login
+ * @returns {Promise<object>} the stub's token response ({ id_token, … })
+ */
+async function exchangeCode(code, verifier) {
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: REDIRECT_URI,
+    code_verifier: verifier,
+    client_id: CLIENT_ID,
+    client_secret: CLIENT_SECRET,
+  }).toString();
+  let res;
+  let text;
+  if (ISSUER_HOST) {
+    res = await postWithHostHeader(`${STUB}/token`, ISSUER_HOST, body);
+    text = res.text;
+  } else {
+    res = await fetch(`${STUB}/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body,
+    });
+    text = await res.text();
+  }
   if (!res.ok) {
     fail(`Token endpoint returned HTTP ${res.status}: ${text.slice(0, ERROR_SNIPPET_MAX)}`);
   }
