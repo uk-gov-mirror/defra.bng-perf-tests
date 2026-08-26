@@ -356,21 +356,28 @@ function collateralImpact(samples) {
     phases.set(phase, window)
   }
 
-  const busyWindows = [...phases.values()]
-  const quiet = probes.filter(
-    (p) => !busyWindows.some((w) => p.ts >= w.from && p.ts <= w.to)
-  )
+  // The phases are scheduled back to back, so two windows only overlap when
+  // the earlier phase's in-flight requests are still draining into the next
+  // one's slot — a saturated step's stragglers can outlive its window by tens
+  // of seconds. A probe sample caught in that overlap is slow because of the
+  // DRAINING phase, so each sample is attributed to exactly one window — the
+  // earliest-starting one that contains it — rather than counted against every
+  // phase it happens to fall inside (which charged the saturation tail to the
+  // quiet phase after it).
+  const windows = [...phases.entries()]
+    .map(([phase, w]) => ({ phase, ...w }))
+    .sort((a, b) => a.from - b.from)
+  const ownerOf = (p) => windows.find((w) => p.ts >= w.from && p.ts <= w.to)
 
   const rows = []
+  const quiet = probes.filter((p) => !ownerOf(p))
   if (quiet.length) {
     const q = stats(quiet)
     rows.push(['(nothing else running)', q.count, fmtMs(q.mean), fmtMs(q.p95), fmtMs(q.max), `${q.failedPct}%`])
   }
-  const ordered = [...phases.entries()].sort(
-    ([a], [b]) => sortKey(a) - sortKey(b)
-  )
-  for (const [phase, w] of ordered) {
-    const during = probes.filter((p) => p.ts >= w.from && p.ts <= w.to)
+  const ordered = [...phases.keys()].sort((a, b) => sortKey(a) - sortKey(b))
+  for (const phase of ordered) {
+    const during = probes.filter((p) => ownerOf(p)?.phase === phase)
     if (during.length === 0) {
       continue
     }
