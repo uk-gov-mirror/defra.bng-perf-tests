@@ -65,13 +65,11 @@ services:
       # every other target above.
       CDP_UPLOADER_URL: ${CDP_UPLOADER_URL:-http://host.docker.internal:7337}
       SERVICE_URL_SCHEME: ${SERVICE_URL_SCHEME:-http}
-      # Which ladder steps run, and so how long a local run takes. `standard` is
-      # ~14 min; use `quick` (~5 min) when iterating on a change rather than
-      # measuring one, and PERF_DUMP_SCHEDULE=true to see a profile's schedule
-      # without running it. See the README's Profiles section.
+      # `standard` is the only profile (~18 min of plan). Use
+      # PERF_DUMP_SCHEDULE=true to see its schedule without running it, and the
+      # per-phase env knobs in the README to narrow a run.
       PERF_PROFILE: ${PERF_PROFILE:-standard}
       PERF_DUMP_SCHEDULE: ${PERF_DUMP_SCHEDULE:-}
-      SOAK_DURATION_SECONDS: ${SOAK_DURATION_SECONDS:-}
     networks:
       - performance-tests
 

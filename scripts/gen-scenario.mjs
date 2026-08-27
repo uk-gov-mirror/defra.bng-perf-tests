@@ -329,13 +329,16 @@ const CHILD = BODY + '  '
  */
 function revalidateStep(step, defaults) {
   const key = stepKey(step)
-  // Not `stepLabel`: that carries the size in brackets, and the size is already
-  // in the sentence. "revalidate large file (large) @ 1 user(s)" reads as a bug.
-  const label = `revalidate ${step.size} file @ ${step.users} user(s)`
+  // The label names the axis this ladder climbs — its sibling is the size
+  // ramp's `validation cost vs file size: <size> (1 user)`. "One <size> upload"
+  // is load-bearing: it is what stops the row reading as N people uploading.
+  // "on", not a comma — labels land in the results CSV, where a comma splits
+  // the row for every naive consumer.
+  const label = `validation cost vs concurrency: ${step.users} user(s) on one ${step.size} upload`
   const budget = step.size === 'everyday' ? 'everydayBudgetMs' : 'validateBudgetMs'
   return lines(
     threadGroup({
-      name: `Revalidate ${step.size} @ ${step.users} user(s)`,
+      name: `Validation cost vs concurrency (${step.size}) @ ${step.users} user(s)`,
       key,
       defaults,
       comment:
@@ -727,8 +730,8 @@ ${BODY}<hashTree>`,
  * A staircase proves an operation scales ALONE. Production runs reads, edits
  * and uploads against one connection pool at the same time, and pool contention
  * is invisible to a plan whose phases never overlap. This is the only group
- * that mixes them, and it is also what PERF_PROFILE=soak holds for half an hour
- * to surface leaks and pool exhaustion that a 30-second phase cannot.
+ * that mixes them, and its two-minute window is the longest sustained load in
+ * the plan — the closest thing to production traffic the suite runs.
  */
 function mixedWorkloadGroup(defaults) {
   return lines(
@@ -743,9 +746,9 @@ function mixedWorkloadGroup(defaults) {
         'the same database, at the same time. Weights are MIX_*_PERCENT and should\n' +
         'add up to 100; they are percent-of-iterations, so they do not drift with\n' +
         'how fast each endpoint happens to be.\n\n' +
-        'PERF_PROFILE=soak runs this group and nothing else, for\n' +
-        'SOAK_DURATION_SECONDS — long enough for a leak, a growing session store\n' +
-        'or pool exhaustion to show up, none of which a 30-second phase can see.\n\n' +
+        'WINDOW_mixed stretches this group on its own — long enough for a leak,\n' +
+        'a growing session store or pool exhaustion to show up, none of which a\n' +
+        '30-second phase can see.\n\n' +
         'The edit and revalidate slices deliberately share the prepared pool, so\n' +
         'a project is being edited while it is being re-validated. That is safe\n' +
         'to repeat: carry-forward-feature-ids.js keys featureIds by parcel ref,\n' +
@@ -863,7 +866,7 @@ function renderLadders(defaults) {
   }
   blocks.push(`${IND}<!-- Single-project fetch ramp -->`)
   blocks.push(fetchRampGroup(defaults))
-  blocks.push(`${IND}<!-- Mixed workload / soak -->`)
+  blocks.push(`${IND}<!-- Mixed workload -->`)
   blocks.push(mixedWorkloadGroup(defaults))
   return blocks.join('\n')
 }
@@ -944,8 +947,8 @@ function renderLaddersSh() {
         )
       }
     }
-    // The size ramp sits in front of every ladder, so at `quick` its 160s
-    // default would be most of the run. It is a profile knob for that reason.
+    // The size ramp sits in front of every ladder, so its depth belongs to the
+    // profile — ladders.config.mjs stays the one place run length is decided.
     for (const size of SIZE_LABELS) {
       out.push(`PROFILE_SIZE_LOOPS_${name}_${size}=${profile.sizeRampLoops[size]}`)
     }

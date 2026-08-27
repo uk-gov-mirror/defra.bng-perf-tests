@@ -31,7 +31,7 @@ from the **root** of the results prefix, so one report per task is what it can s
 | `Everyday user (background probe)`        | both                   | What an ordinary user experiences *while* the load phases run.                |
 | `Size ramp`                               | `bng-metric-backend`   | Cost of validating one file, across four file sizes.                          |
 | **`Upload journey <size> @ N user(s)`**   | backend + cdp-uploader | **N people each uploading their own file at once** — initiate, upload, scan, validate. |
-| `Revalidate <size> @ N user(s)`           | `bng-metric-backend`   | Validate cost alone as concurrency climbs — one staged upload, replayed.      |
+| `Validation cost vs concurrency (<size>) @ N user(s)` | `bng-metric-backend` | Validate cost alone as concurrency climbs — one staged upload, replayed.  |
 | `Post-intervention validate <size> @ N`   | `bng-metric-backend`   | The peer of `/baseline/validate`, against projects that already hold a baseline. |
 | `Habitat edit <size> @ N user(s)`         | `bng-metric-backend`   | `PUT …/habitats/{featureId}` throughput — each thread on its own project.     |
 | `Habitat edit contention @ N user(s)`     | `bng-metric-backend`   | The same PUT, all threads on **one** project — where the row lock starts 409ing. |
@@ -67,36 +67,32 @@ project-creation groups — is hand-written and never touched.
 The generator writes **two** outputs, which is what keeps the plan and the schedule from
 drifting apart: the `.jmx`, and `scenarios/ladders.sh`, a POSIX-sh fragment
 `entrypoint.sh` sources for the same step lists. A test asserts that the shell and the
-generator derive an identical schedule for every profile.
+generator derive an identical schedule for the profile.
 
-### Profiles — how long a run takes
+### The profile — how long a run takes
 
-The plan contains **53 ladder steps**. Which of them run is a run-time choice, because
-running all of them takes half an hour, and a perf run that takes longer than someone
-will wait measures nothing — they stop running it.
+There is exactly **one profile**: `standard`. There used to be five (`quick` /
+`standard` / `deep` / `full` / `soak`); keeping five step lists meaningful cost more
+than the flexibility bought, so the suite now runs one well-chosen set — the old
+`deep`. The plan contains **53 ladder steps** and `standard` runs 40 of them: the
+contiguous 1..10 everyday journey ladder, both file sizes on every other ladder, the
+full contention ladder, and a two-minute mixed workload — **~18 min of plan against a
+20-minute budget**. (The steps it skips — the `busy` intermediate journeys and the
+`xlarge` journey/revalidate extremes — exist in the plan at 0 threads.)
 
-| `PERF_PROFILE` | Plan    | Budget       | What it runs                                        |
-| -------------- | ------- | ------------ | --------------------------------------------------- |
-| `quick`        | ~4 min  | **6 min**    | The shape of the curve. For iterating on a change.   |
-| `standard`     | ~8 min  | **10 min**   | **The default.** The contiguous 1..10 journey ladder, plus one step of every other question. |
-| `deep`         | ~18 min | none         | Everything `standard` trims for time — intermediate steps, both file sizes on every ladder. |
-| `full`         | ~27 min | none         | Every step in `ladders.config.mjs`.                  |
-| `soak`         | ~31 min | none         | The mixed workload and nothing else, held for `SOAK_DURATION_SECONDS`. |
-
-A profile never changes what the plan **contains** — every step has a thread group
+The profile never changes what the plan **contains** — every step has a thread group
 either way. It sets thread counts, and **a step at 0 threads costs nothing and reserves
 no wall clock**, because the delays are derived rather than written down. That is the
 same contract `SIZE_RAMP_THREADS=0` already had, applied to every step.
 
 #### The budget is enforced, not aspirational
 
-`standard` has a **hard ten-minute ceiling**, and it is checked in two places rather
+`standard` has a **hard twenty-minute ceiling**, and it is checked in two places rather
 than hoped for:
 
-- **At design time**, `npm test` fails if `standard` projects over ten minutes. A step
-  that will not fit belongs in `deep` — which is what `deep` is for, so a trim is a
-  scheduling decision rather than a coverage one. A test asserts that every step
-  `standard` runs is also in `deep`.
+- **At design time**, `npm test` fails if the profile projects over twenty minutes. A
+  step that will not fit forces a deliberate decision — trim a ladder, or move the
+  ceiling on purpose.
 - **At run time**, `entrypoint.sh` measures how long setup actually took and warns if
   the projection exceeds the budget, naming the knob to reach for.
 
@@ -108,55 +104,41 @@ the plan's timeline and staging is most of it, so the budget carries an explicit
 `SIZE_ALLOWANCE_*` numbers. Every run reports the real figure:
 
 ```
-▸ setup took 62s; the plan runs for 487s — projected total 549s (~9 min)
+▸ setup took 62s; the plan runs for 1056s — projected total 1118s (~19 min)
 ```
 
 If setup is consistently well under 90 s on your environment, lower
 `SETUP_ALLOWANCE_SECONDS` and the ladders get the difference back automatically.
 
-#### What `standard` gives up to hold ten minutes
-
-Honest accounting — all of it is in `deep`:
-
-| Trim | Why it was the one to cut |
-| --- | --- |
-| `revalidate_large_1` | It is the **same request** as the size ramp's `validate large file (1 user)` — one staged upload, one user, one POST. The size ramp reports it already, with an exact sample count. |
-| `journey.large` 1/2/3 → 1/3 | 1 and 3 bracket the range; the middle step of a three-step ladder is the one a reader interpolates anyway. |
-| `edit` 1/2/5 → 1/5, contention 2/5 → 5 | Same bracketing argument. At 2 users the contention answer is almost always "nobody is refused", which is the least informative point on that ladder. |
-| Size-ramp weights 20/8/3/2 → 8/3/2/1 | At the old weights the ramp reserved 160 s — a quarter of the whole budget — in front of every ladder. `xlarge` becomes a single worst-case probe, the pattern the project-creation group already uses. |
-| Sampling depth (`targetSamples`) | Journey 6→5, edit 20→12, post-intervention 4→3. |
-| Window ceiling 45 s → 30 s | A ladder's 1-user step is a **baseline for that ladder**, not the primary single-upload measurement — the size ramp owns that question. At 45 s, one `large` journey step cost more than the entire everyday ladder's floor. |
-| Inter-phase gap, flat 5 s → derived | What a phase needs to drain is about **one in-flight request**. Five seconds after a one-second edit is four seconds of nothing, and across 21 phases the flat gap was 125 s. Now `ceil(secondsPerIteration)`, clamped to 1–5 s. |
-
-The contiguous 1..10 journey ladder was not touched — it is the point of the suite, and
-at 96 s of windows plus 40 s of gaps it is the largest single block in the run.
-
-To see what a profile would run without running it:
+To see what the profile runs without running it:
 
 ```sh
-PERF_PROFILE=quick PERF_DUMP_SCHEDULE=true ./entrypoint.sh
+PERF_DUMP_SCHEDULE=true ./entrypoint.sh
 ```
 
-A `standard` run looks like this — note how the windows *shrink* as each ladder climbs:
+A run looks like this — note how the windows *shrink* as each ladder climbs:
 
 ```
-seconds  0    25  55       133 138      272      336  366  399 421 430  462  487
-home+list|====|
-probe         |==========================================================|
-size ramp          |=======|
-journey everyday 1..10      |=|=|=|=|=|=|=|=|=|=|
-journey large 1,3                            |==|=|
-revalidate large 5,20                              |=|=|
-post-intervention 1,5                                   |=|=|
-habitat edit 1,5                                             |=|=|
-edit contention 5                                                |=|
-fetch ramp                                                        |==|
-mixed workload                                                       |==|
+seconds                     0             215      350  415     546     659    768    865 933     1053
+home+list                   |=|
+probe                         |===================================================================|
+size ramp                       |=========|
+journey everyday 1..10                     |=======|
+journey busy 1,5,10                                 |==|
+journey large 1..10                                     |=======|
+revalidate large 1..20                                          |=======|
+post-intervention everyday                                              |===|
+post-intervention large 1,5                                                 |==|
+habitat edit everyday 1..10                                                    |==|
+habitat edit large 1,5                                                            |==|
+edit contention 2..10                                                                 |=|
+fetch ramp                                                                              |=|
+mixed workload                                                                            |=======|
 ```
 
 Setup — token, seed, staging, prepared pools — happens before second zero, and the
 report is published after the last phase. Those are the ~90 s the budget reserves on
-top of the 487 s above.
+top of the 1056 s above.
 
 #### Why the windows shrink
 
@@ -317,11 +299,11 @@ They are built to answer these questions, in roughly the order a PM asks them:
 
 | Question                                                       | Where the answer is                                   |
 | -------------------------------------------------------------- | ----------------------------------------------------- |
-| What does an everyday upload cost?                             | `validate everyday file (1 user)`                     |
+| What does an everyday upload cost?                             | `validation cost vs file size: everyday (1 user)`     |
 | At what file size does it become a problem?                    | the rest of the size ramp                             |
 | **What happens when N people upload N files at once?**         | `end to end (<size>) @ N user(s)`                     |
 | Where does that journey time go?                               | the `journey (<size>) @ N user(s): <leg>` rows        |
-| At what concurrency does validate alone become a problem?      | `revalidate <size> file @ N user(s)`                  |
+| At what concurrency does validate alone become a problem?      | `validation cost vs concurrency: N user(s) on one <size> upload` |
 | What does a post-intervention upload cost?                     | `post-intervention validate (<size>) @ N user(s)`     |
 | What does editing a habitat cost, once the file is in?         | `habitat edit distinct projects (<size>) @ N user(s)` |
 | When do two people editing one project start being refused?    | `habitat edit same project @ N user(s)`               |
@@ -334,7 +316,7 @@ is expected and mostly affects the person uploading. An unrelated project list
 going from 200 ms to a timeout is an availability story, and only a probe
 running **concurrently** with the load can show it. Every phase is scheduled, so
 they run in sequence while the probe spans the whole run — see the
-[timeline](#profiles--how-long-a-run-takes) above.
+[timeline](#the-profile--how-long-a-run-takes) above.
 
 The 30-55 s stretch, after the probe starts but before any load, is the quiet
 baseline every loaded phase is read against.
@@ -345,16 +327,23 @@ There are two staircases that both climb concurrency against uploads, and they a
 different questions. Reading one as the other is the single easiest mistake to make
 with this suite:
 
-| | `Upload journey <size> @ N user(s)` | `Revalidate <size> @ N user(s)` |
+| | `Upload journey <size> @ N user(s)` | `Validation cost vs concurrency (<size>) @ N user(s)` |
 | --- | --- | --- |
 | What each thread does | initiate → POST its **own** file to the uploader → validate | POST `/baseline/validate/{id}` against **one** pre-staged upload |
 | Bytes through the uploader | every iteration | none — staged once, before the run |
 | Virus scan | inside the measurement | outside it |
 | Answers | "10 people upload 10 files at once" | "what does validate alone cost at 10x?" |
 
-The revalidate ladder used to be called `Concurrency N user(s) — large file`, which
-reads in a pasted summary as *"N people uploaded large files"* — and it is not that. It
-was renamed for that reason, and the journey ladder is the one that means it.
+This ladder has been renamed twice, both times because of how its rows read in a
+pasted summary. As `Concurrency N user(s) — large file` it read as *"N people
+uploaded large files"* — and it is not that; the journey ladder is the one that
+means it. As `Revalidate <size> @ N user(s)` it read as a different operation
+from the size ramp's "validate" when it is the **same request** — the two groups
+differ only in which axis they climb. The labels now name that axis:
+`validation cost vs file size` (the size ramp) and `validation cost vs
+concurrency` (this ladder). The schedule key is still `revalidate_<size>_<n>` —
+that is a shell identifier shared with `entrypoint.sh`, not something a reader
+of the report sees.
 
 #### The journey ladder runs per file size
 
@@ -419,17 +408,17 @@ pagination above it.
 One user, one size after another, loop-count driven inside a duration guard like the
 size ramp: the number is the cost of the payload, not the cost of contention.
 
-#### The mixed workload, and the soak
+#### The mixed workload
 
 Every other phase runs one operation in isolation, so each proves that operation scales
 **alone**. Production runs reads, edits and uploads against one connection pool at the
 same time, and pool contention is invisible to a plan whose phases never overlap.
 
 The mixed workload is the one group that overlaps them, weighted by percent of
-iterations (`MIX_*_PERCENT`, defaulting to 40/25/25/10 list/fetch/edit/validate).
-`PERF_PROFILE=soak` runs *only* this group, for `SOAK_DURATION_SECONDS` — long enough
-for a leak, a growing session store or pool exhaustion to show up, none of which a
-30-second phase can see.
+iterations (`MIX_*_PERCENT`, defaulting to 40/25/25/10 list/fetch/edit/validate). Its
+two-minute window is the longest sustained load in the plan; `WINDOW_mixed` stretches
+it further for a soak-style run — long enough for a leak, a growing session store or
+pool exhaustion to show up, none of which a 30-second phase can see.
 
 #### The size ramp is one user, and weighted
 
@@ -437,7 +426,7 @@ The ramp runs a single user through a **fixed, weighted pass** — 20 `everyday`
 8 `busy`, 3 `large`, 2 `xlarge` — rather than looping all four evenly until the
 clock runs out.
 
-One user is deliberate: `validate everyday file (1 user)` only means "what an
+One user is deliberate: `validation cost vs file size: everyday (1 user)` only means "what an
 everyday upload costs" if nothing else is hitting the service while it is
 measured, which is why each size does **not** get its own thread. But an even
 pass has a flaw — every size shares a sample count with the slowest one, because
@@ -729,10 +718,9 @@ run is meaningless.
 | `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the four sizes.                            |
 | `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}` | `20/8/3/2`                            | Samples per size in a pass. Weighted so small files earn a percentile. |
 | `SIZE_RAMP_DELAY_SECONDS`        | _derived_                                      | When the size ramp starts.                                      |
-| `PERF_PROFILE`                   | `standard`                                     | `quick` / `standard` / `full` / `soak` — which steps run. See [Profiles](#profiles--how-long-a-run-takes). |
+| `PERF_PROFILE`                   | `standard`                                     | The only profile. See [The profile](#the-profile--how-long-a-run-takes). |
 | `PERF_DUMP_SCHEDULE`             | unset                                          | `true` prints the resolved schedule and exits, touching nothing. |
 | `WINDOW_<step>`                  | _derived_                                      | Override one step's window, e.g. `WINDOW_journey_everyday_10=30`. The timeline re-derives around it. |
-| `SOAK_DURATION_SECONDS`          | `1800` (soak profile)                          | How long the mixed workload is held for.                        |
 | `PHASE_GAP_SECONDS`              | _derived per phase_                            | Set it and every phase gets that uniform gap instead of its own drain time. |
 | `MIX_THREADS`                    | `8`                                            | Threads on the mixed workload.                                  |
 | `MIX_{LIST,FETCH,EDIT,VALIDATE}_PERCENT` | `40/25/25/10`                          | The mix, as percent of iterations. Warns if they do not total 100. |
@@ -779,17 +767,11 @@ LocalStack service can go with it.
 > still gets a consistent schedule. Setting a delay explicitly overrides the
 > derivation, and from there the arithmetic is yours.
 
-**Want more samples rather than a faster answer?** Two knobs, in order of how
-often you want them:
+**Want more samples rather than a faster answer?** `WINDOW_<step>` lengthens one
+step — `WINDOW_journey_everyday_10=30` triples the samples behind that percentile. The
+timeline re-derives around it and every later phase, plus the probe, moves to match.
 
-- `PERF_PROFILE=deep` runs everything `standard` trims for time (~18 min), and
-  `PERF_PROFILE=full` every step in the plan (~27 min). This is the usual answer, and
-  it is what the profiles exist for.
-- `WINDOW_<step>` lengthens one step — `WINDOW_journey_everyday_10=30` triples the
-  samples behind that percentile. The timeline re-derives around it and every later
-  phase, plus the probe, moves to match.
-
-There is still no separate "deep" plan to remember: a profile picks *which* steps, a
+There is no separate "deep" plan to remember: the profile picks *which* steps, a
 window picks *how long* one of them runs, and everything else follows from those two.
 
 ### Authenticating: a real cdp-defra-id-stub token
@@ -948,18 +930,16 @@ By default it points the frontend group at `host.docker.internal:3000` and the b
 group at `host.docker.internal:3001`. Once LocalStack is healthy the run starts
 automatically, and the container exits when the run finishes.
 
-A local run defaults to `PERF_PROFILE=standard` — ~8 minutes of plan, ~10 with setup.
-When you are iterating on a change rather than measuring one:
+A run is ~18 minutes of plan, ~19–20 with setup. To see the schedule before spending
+the time on it:
 
 ```bash
-PERF_PROFILE=quick docker compose up --build       # ~4 min plan, ~6 with setup
+PERF_DUMP_SCHEDULE=true ./entrypoint.sh
 ```
 
-And to see what a profile would do before spending the time on it:
-
-```bash
-PERF_PROFILE=full PERF_DUMP_SCHEDULE=true ./entrypoint.sh
-```
+When you are iterating on a change rather than measuring one, narrow the run with the
+per-phase env knobs (`WINDOW_<step>`, `STAGE_UPLOADS=false`, `CREATE_THREADS=0`, …)
+rather than reaching for a profile — there is only one.
 
 ### Working on the suite itself
 

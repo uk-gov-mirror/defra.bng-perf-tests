@@ -129,10 +129,10 @@ function isProbe(label) {
   return label.startsWith('probe')
 }
 function isSizeRamp(label) {
-  return label.startsWith('validate ') && label.endsWith('(1 user)')
+  return label.startsWith('validation cost vs file size:')
 }
-function isRevalidate(label) {
-  return label.startsWith('revalidate ')
+function isValidationConcurrency(label) {
+  return label.startsWith('validation cost vs concurrency:')
 }
 function isJourney(label) {
   return label.startsWith('journey (')
@@ -174,7 +174,7 @@ function sortKey(label) {
   const size = SIZE_ORDER.findIndex(
     (name) => label.includes(`(${name})`) || label.includes(` ${name} `)
   )
-  const users = /@ (\d+) user/.exec(label)
+  const users = /(\d+) user/.exec(label)
   const sizeRank = size === -1 ? SIZE_ORDER.length : size
   return sizeRank * SORT_SIZE_STRIDE + (users ? Number(users[1]) : 0)
 }
@@ -245,7 +245,7 @@ function rampCoverage(samples) {
   let short = false
   for (const { size, count } of expected) {
     // Same label shape isSizeRamp and sortKey already rely on.
-    const got = counts.get(`validate ${size} file (1 user)`) ?? 0
+    const got = counts.get(`validation cost vs file size: ${size} (1 user)`) ?? 0
     const complete = got >= count
     short = short || !complete
     rows.push([size, count, complete ? got : `${got}  ← CUT OFF`])
@@ -542,7 +542,7 @@ function main() {
     ['…and where does that journey time go? (per leg)', isJourney],
     [
       'What does validate alone cost as concurrency climbs? (one staged upload, replayed)',
-      isRevalidate
+      isValidationConcurrency
     ],
     ['What does a post-intervention upload cost?', isPostIntervention],
     ['What does editing one habitat cost, and how does it scale?', isEdit],

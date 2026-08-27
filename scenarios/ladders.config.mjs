@@ -84,15 +84,20 @@ export const LADDERS = [
   {
     key: 'revalidate',
     /**
-     * The original concurrency staircase, renamed.
+     * The original concurrency staircase, renamed twice now.
      *
      * Every thread here re-validates ONE pre-staged upload, so it isolates the
      * service's own validate cost from the uploader's — which is what it is
      * for. It was called "Concurrency N user(s) — large file", which reads in a
-     * pasted summary as "N people uploaded large files", and it is not that.
-     * The journey ladder above is that.
+     * pasted summary as "N people uploaded large files" (the journey ladder is
+     * that); then "Revalidate <size> @ N user(s)", which read as a different
+     * operation from the size ramp's "validate" when it is the SAME request.
+     * The label now names the axis, pairing it with the size ramp's
+     * "validation cost vs file size". The key stays `revalidate` because it is
+     * a shell identifier shared with entrypoint.sh, not something a reader of
+     * the report ever sees.
      */
-    title: 'Revalidate staged upload',
+    title: 'Validation cost vs concurrency',
     perSize: true,
     sizes: {
       large: { steps: [1, 2, 3, 4, 5, 10, 15, 20], secondsPerIteration: 12 },
@@ -198,86 +203,26 @@ export const WINDOW_BOUNDS = { minStepSeconds: 8, maxStepSeconds: 30 }
 export const SETUP_ALLOWANCE_SECONDS = 90
 
 /**
- * Profiles: which steps run, at what sampling depth.
+ * The profile: which steps run, at what sampling depth.
  *
- * A profile never changes what the plan CONTAINS — every step above exists in
- * the .jmx either way. It sets thread counts, and a step at 0 threads costs
- * nothing and reserves nothing.
+ * There is exactly ONE profile. There used to be five (quick / standard / deep
+ * / full / soak); the maintenance cost of keeping five step lists meaningful
+ * outweighed the scheduling flexibility, so `standard` now IS the old `deep` —
+ * the intermediate ladder steps, both file sizes on every ladder, and a mixed
+ * workload long enough to mean something — and the others are gone.
  *
- *   quick     — the shape of the curve, for iterating on a change (~6 min)
- *   standard  — the default: the contiguous journey ladder the suite exists
- *               for, plus one step of every other question (~13 min)
- *   full      — every step in this file (~35 min); an overnight answer
- *   soak      — the mixed workload only, held for SOAK_DURATION_SECONDS
- *
- * `steps` here INTERSECTS the ladder's own list — a profile can never invent a
- * step the plan has no thread group for.
+ * The profile never changes what the plan CONTAINS — steps it does not name
+ * still exist in the .jmx at 0 threads, which costs nothing and reserves
+ * nothing. `steps` here INTERSECTS the ladder's own list — the profile can
+ * never invent a step the plan has no thread group for.
  */
 export const PROFILES = {
-  quick: {
-    description: 'the shape of the curve, for iterating on a change',
-    budgetMinutes: 6,
-    ladders: {
-      journey: { everyday: [1, 2, 5] },
-      revalidate: { large: [1, 5] },
-      pi: {},
-      edit: { everyday: [1, 5] },
-      editContention: [5]
-    },
-    fetchRamp: true,
-    mixedSeconds: 0,
-    targetScale: 0.5,
-    sizeRampLoops: { everyday: 6, busy: 3, large: 1, xlarge: 1 }
-  },
   standard: {
-    description: 'the default — the full journey ladder plus one step of everything else',
-    // A HARD ceiling, enforced by a test: this profile is the one a person sits
-    // and waits for, and a run they stop waiting for measures nothing. Every
-    // trim in this block exists to hold it. If a future step will not fit,
-    // that is a decision to make deliberately — put it in `deep`, or move the
-    // ceiling on purpose.
-    budgetMinutes: 10,
-    // Trimmed to hold `budgetMinutes` below. Each cut is a redundancy rather
-    // than a compromise:
-    //
-    //   journey.large [1, 2, 3]  →  [1, 3]
-    //     1 and 3 bracket the range; the middle step of a three-step ladder is
-    //     the one that buys least, and `full` still runs 1/2/3/5/8/10.
-    //
-    //   revalidate.large [1, 5, 20]  →  [5, 20]
-    //     `revalidate_large_1` was the SAME REQUEST as the size ramp's
-    //     `validate large file (1 user)` — one staged upload, one user, one
-    //     POST to /baseline/validate. The size ramp already reports it, with an
-    //     exact sample count. Read that row as this ladder's 1-user baseline.
-    ladders: {
-      journey: { everyday: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], large: [1, 3] },
-      revalidate: { large: [5, 20] },
-      pi: { everyday: [1, 5] },
-      // 1 and 5 bracket the edit ladder; 2 sits between two points that are 10s
-      // apart and is the one a reader would interpolate anyway. `deep` has it.
-      edit: { everyday: [1, 5] },
-      // The contention question is "at what concurrency do people start being
-      // refused", and 2 users is where the answer is almost always "they don't".
-      // 5 is the informative point; `deep` runs the ladder.
-      editContention: [5]
-    },
-    fetchRamp: true,
-    mixedSeconds: 25,
-    targetScale: 1,
-    // 20/8/3/2 reserved 160 s — nearly a third of a ten-minute budget, in front
-    // of every ladder in the run. 12 everyday samples still earn a percentile,
-    // and `xlarge` becomes a single worst-case probe, which is the pattern the
-    // project-creation group already uses (CREATE_LARGE_LOOPS=1) for the same
-    // reason: it is a stress fixture, not a size anyone submits.
-    sizeRampLoops: { everyday: 8, busy: 3, large: 2, xlarge: 1 }
-  },
-  deep: {
-    description: 'everything standard trims for time, without the full 27 minutes',
-    // Nothing standard dropped is LOST — it is here. This is the profile to run
-    // when a standard run has raised a question rather than answered it: the
-    // intermediate ladder steps, both file sizes on every ladder, and a mixed
-    // workload long enough to mean something.
-    budgetMinutes: null,
+    description: 'the only profile — full ladders at both file sizes, and a two-minute mixed workload',
+    // A HARD ceiling, enforced by a test: this is the run a person sits and
+    // waits for, and a run they stop waiting for measures nothing. If a future
+    // step will not fit, trim a ladder or move the ceiling on purpose.
+    budgetMinutes: 20,
     ladders: {
       journey: {
         everyday: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
@@ -293,32 +238,6 @@ export const PROFILES = {
     mixedSeconds: 120,
     targetScale: 1,
     sizeRampLoops: { everyday: 20, busy: 8, large: 3, xlarge: 2 }
-  },
-  full: {
-    description: 'every step in ladders.config.mjs',
-    budgetMinutes: null,
-    ladders: 'all',
-    fetchRamp: true,
-    mixedSeconds: 90,
-    targetScale: 1.5,
-    sizeRampLoops: { everyday: 30, busy: 12, large: 5, xlarge: 3 }
-  },
-  soak: {
-    description: 'the mixed workload only, held for SOAK_DURATION_SECONDS',
-    budgetMinutes: null,
-    ladders: {
-      journey: {},
-      revalidate: {},
-      pi: {},
-      edit: {},
-      editContention: []
-    },
-    fetchRamp: false,
-    mixedSeconds: 1800,
-    targetScale: 1,
-    // The soak is the mixed workload and nothing else: a size ramp in front of
-    // it would just be 160s of unrelated load before the clock starts.
-    sizeRampLoops: { everyday: 0, busy: 0, large: 0, xlarge: 0 }
   }
 }
 
@@ -615,9 +534,9 @@ export function stepLabel({ size, users }) {
 /**
  * Does a profile fit its own time budget, once setup is accounted for?
  *
- * Returns null for a profile with no budget (`deep`, `full`, `soak` are
- * deliberately long-running). Otherwise returns the projection and whether it
- * fits, so the caller can decide whether that is a warning or a failure — the
+ * Returns null for a profile with no budget. Otherwise returns the projection
+ * and whether it fits, so the caller can decide whether that is a warning or a
+ * failure — the
  * test treats it as a failure, entrypoint.sh as a warning against the MEASURED
  * setup time rather than the estimate.
  */

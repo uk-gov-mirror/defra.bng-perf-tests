@@ -42,7 +42,7 @@ function buildResults() {
     ['xlarge', 9000, 2]
   ]) {
     for (let i = 0; i < n; i++) {
-      add(`validate ${size} file (1 user)`, ms, '200', 'Size ramp 1-1')
+      add(`validation cost vs file size: ${size} (1 user)`, ms, '200', 'Size ramp 1-1')
     }
   }
 
@@ -64,7 +64,7 @@ function buildResults() {
 
   for (const users of [1, 5, 20]) {
     for (let i = 0; i < 5; i++) {
-      add(`revalidate large file @ ${users} user(s)`, 3800 + users * 200, '200', 'Revalidate 1-1')
+      add(`validation cost vs concurrency: ${users} user(s) on one large upload`, 3800 + users * 200, '200', 'Validation vs concurrency 1-1')
     }
   }
   for (const users of [1, 5]) {
@@ -137,7 +137,7 @@ describe('every group reports', () => {
     ['upload journey, end to end', 'N people upload N files at once'],
     ['size ramp', 'How long does one upload take, by file size?'],
     ['journey legs', 'where does that journey time go'],
-    ['revalidate', 'What does validate alone cost as concurrency climbs'],
+    ['validation vs concurrency', 'What does validate alone cost as concurrency climbs'],
     ['post-intervention', 'What does a post-intervention upload cost'],
     ['habitat edit', 'What does editing one habitat cost'],
     ['project fetch', 'What does fetching a whole project cost'],

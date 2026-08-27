@@ -688,7 +688,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate everyday file (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs file size: everyday (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_everyday,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -736,7 +736,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate busy file (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs file size: busy (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_busy,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -784,7 +784,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate large file (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs file size: large (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -832,7 +832,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validate xlarge file (1 user)">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs file size: xlarge (1 user)">
             <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -891,7 +891,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_1,20)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_1,138)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_1,220)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1086,7 +1086,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_2,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_2,162)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_2,244)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1281,7 +1281,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_3,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_3,176)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_3,258)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1476,7 +1476,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_4,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_4,188)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_4,270)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1671,7 +1671,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_5,200)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_5,282)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1866,7 +1866,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_6,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_6,212)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_6,294)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2061,7 +2061,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_7,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_7,224)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_7,306)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2256,7 +2256,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_8,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_8,236)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_8,318)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2451,7 +2451,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_9,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_9,248)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_9,330)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2646,7 +2646,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_10,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_10,260)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_10,342)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2837,11 +2837,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_busy_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_busy_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_busy_1,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_busy_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_busy_1,354)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -3227,11 +3227,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_busy_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_busy_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_busy_5,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_busy_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_busy_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_busy_5,389)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -3422,11 +3422,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_busy_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_busy_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_busy_10,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_busy_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_busy_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_busy_10,402)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -3621,7 +3621,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_large_1,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_1,272)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_1,415)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -3812,11 +3812,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_large_2,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_2,450)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -4011,7 +4011,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_journey_large_3,24)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_3,307)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_3,485)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -4202,11 +4202,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_5,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_5,14)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_5,514)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -4592,11 +4592,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_10,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_10,533)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5363,19 +5363,19 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <!-- Revalidate staged upload: 11 step(s) -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 1 user(s)">
+      <!-- Validation cost vs concurrency: 11 step(s) -->
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 1 user(s)">
         <stringProp name="TestPlan.comments">1 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
 bytes are already in S3 and already scanned. It is NOT N people uploading
 N files; the upload journey ladder is that, and the two sit next to each
 other in the report so the difference between them is the uploader.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_1,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_1,546)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5422,7 +5422,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 1 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 1 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -5465,18 +5465,18 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 2 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 2 user(s)">
         <stringProp name="TestPlan.comments">2 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
 bytes are already in S3 and already scanned. It is NOT N people uploading
 N files; the upload journey ladder is that, and the two sit next to each
 other in the report so the difference between them is the uploader.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_2,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_2,581)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5523,7 +5523,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 2 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 2 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -5566,7 +5566,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 3 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 3 user(s)">
         <stringProp name="TestPlan.comments">3 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -5624,7 +5624,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 3 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 3 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -5667,7 +5667,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 4 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 4 user(s)">
         <stringProp name="TestPlan.comments">4 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -5725,7 +5725,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 4 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 4 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -5768,7 +5768,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 5 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 5 user(s)">
         <stringProp name="TestPlan.comments">5 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -5779,7 +5779,7 @@ other in the report so the difference between them is the uploader.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_5,12)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_5,336)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_5,616)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5826,7 +5826,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 5 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 5 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -5869,18 +5869,18 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 10 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 10 user(s)">
         <stringProp name="TestPlan.comments">10 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
 bytes are already in S3 and already scanned. It is NOT N people uploading
 N files; the upload journey ladder is that, and the two sit next to each
 other in the report so the difference between them is the uploader.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_10,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_10,633)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5927,7 +5927,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 10 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 10 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -5970,7 +5970,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 15 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 15 user(s)">
         <stringProp name="TestPlan.comments">15 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -6028,7 +6028,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 15 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 15 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -6071,7 +6071,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate large @ 20 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (large) @ 20 user(s)">
         <stringProp name="TestPlan.comments">20 thread(s) re-validating ONE pre-staged large upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -6082,7 +6082,7 @@ other in the report so the difference between them is the uploader.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_20,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_20,353)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_20,646)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6129,7 +6129,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate large file @ 20 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 20 user(s) on one large upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_large,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -6172,7 +6172,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate xlarge @ 1 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (xlarge) @ 1 user(s)">
         <stringProp name="TestPlan.comments">1 thread(s) re-validating ONE pre-staged xlarge upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -6230,7 +6230,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate xlarge file @ 1 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 1 user(s) on one xlarge upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -6273,7 +6273,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate xlarge @ 2 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (xlarge) @ 2 user(s)">
         <stringProp name="TestPlan.comments">2 thread(s) re-validating ONE pre-staged xlarge upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -6331,7 +6331,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate xlarge file @ 2 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 2 user(s) on one xlarge upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -6374,7 +6374,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Revalidate xlarge @ 5 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Validation cost vs concurrency (xlarge) @ 5 user(s)">
         <stringProp name="TestPlan.comments">5 thread(s) re-validating ONE pre-staged xlarge upload.
 
 This isolates the service&apos;s own validate cost from the uploader&apos;s — the
@@ -6432,7 +6432,7 @@ other in the report so the difference between them is the uploader.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="revalidate xlarge file @ 5 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs concurrency: 5 user(s) on one xlarge upload">
           <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_xlarge,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -6486,7 +6486,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_1,15)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_1,366)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_1,659)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6582,11 +6582,11 @@ reconciles against the stored baseline rather than starting from nothing.</strin
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_2,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_2,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_2,679)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6686,7 +6686,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_5,386)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_5,692)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6782,11 +6782,11 @@ reconciles against the stored baseline rather than starting from nothing.</strin
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_10,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_10,705)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6882,11 +6882,11 @@ reconciles against the stored baseline rather than starting from nothing.</strin
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_large_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_large_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_pi_large_1,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_large_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_large_1,718)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7082,11 +7082,11 @@ reconciles against the stored baseline rather than starting from nothing.</strin
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_large_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_large_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_large_5,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_large_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_large_5,10)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_large_5,753)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7190,7 +7190,7 @@ nothing around it is.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_1,12)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_1,399)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_1,768)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7280,11 +7280,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_2,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_2,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_2,781)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7374,11 +7374,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_3,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_3,3)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_3,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_3,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_3,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_3,790)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7472,7 +7472,7 @@ nothing around it is.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_5,412)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_5,799)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7562,11 +7562,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_10,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_10,808)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7656,11 +7656,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_large_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_large_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_edit_large_1,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_large_1,0)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_large_1,817)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7844,11 +7844,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_large_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_large_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_large_5,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_large_5,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_large_5,10)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_large_5,851)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7938,11 +7938,11 @@ project row, so these serialise and eventually 409 with &quot;Another edit for
 this project is in progress&quot;. The number to read is the 409 RATE, not the
 latency — 409 is a correct answer here, so it is asserted as acceptable
 and counted separately in the summary rather than painting the report red.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_editContention_2,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_2,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_editContention_2,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_2,865)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8027,11 +8027,11 @@ project row, so these serialise and eventually 409 with &quot;Another edit for
 this project is in progress&quot;. The number to read is the 409 RATE, not the
 latency — 409 is a correct answer here, so it is asserted as acceptable
 and counted separately in the summary rather than painting the report red.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_3,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_3,3)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_editContention_3,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_3,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_editContention_3,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_3,874)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8120,7 +8120,7 @@ and counted separately in the summary rather than painting the report red.</stri
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_editContention_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_5,421)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_5,883)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8205,11 +8205,11 @@ project row, so these serialise and eventually 409 with &quot;Another edit for
 this project is in progress&quot;. The number to read is the 409 RATE, not the
 latency — 409 is a correct answer here, so it is asserted as acceptable
 and counted separately in the summary rather than painting the report red.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_editContention_10,30)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_10,0)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_editContention_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_10,892)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8302,7 +8302,7 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_fetchRamp,27)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_fetchRamp,430)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_fetchRamp,901)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8466,7 +8466,7 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
           </hashTree>
         </hashTree>
       </hashTree>
-      <!-- Mixed workload / soak -->
+      <!-- Mixed workload -->
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Mixed workload (reads + edits + uploads together)">
         <stringProp name="TestPlan.comments">A weighted mix of everything, run concurrently rather than in phases.
 
@@ -8476,9 +8476,9 @@ the same database, at the same time. Weights are MIX_*_PERCENT and should
 add up to 100; they are percent-of-iterations, so they do not drift with
 how fast each endpoint happens to be.
 
-PERF_PROFILE=soak runs this group and nothing else, for
-SOAK_DURATION_SECONDS — long enough for a leak, a growing session store
-or pool exhaustion to show up, none of which a 30-second phase can see.
+WINDOW_mixed stretches this group on its own — long enough for a leak,
+a growing session store or pool exhaustion to show up, none of which a
+30-second phase can see.
 
 The edit and revalidate slices deliberately share the prepared pool, so
 a project is being edited while it is being re-validated. That is safe
@@ -8489,8 +8489,8 @@ that, every revalidate would 404 the edits behind it.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_mixed,8)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_mixed,25)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_mixed,462)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_mixed,120)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_mixed,933)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">

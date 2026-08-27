@@ -98,17 +98,11 @@ describe('profiles', () => {
     assert.deepEqual(users, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })
 
-  test('quick is meaningfully shorter than standard, and full longer', () => {
-    const total = (name) =>
-      profilePhases(name).reduce((sum, p) => sum + p.window, 0)
-    assert.ok(total('quick') < total('standard'))
-    assert.ok(total('standard') < total('full'))
-  })
-
-  test('soak runs the mixed workload and nothing else', () => {
-    const phases = profilePhases('soak')
-    assert.equal(phases.length, 1)
-    assert.equal(phases[0].key, 'mixed')
+  test('standard is the only profile', () => {
+    // The suite deliberately has ONE profile: five step lists proved harder to
+    // keep meaningful than one. A second entry here should be a conscious
+    // decision to bring the profile machinery back, not an accident.
+    assert.deepEqual(Object.keys(PROFILES), ['standard'])
   })
 })
 
@@ -134,7 +128,7 @@ describe('schedule', () => {
 
   test('a ladder climbs — steps of one size are in ascending user order', () => {
     const bySize = new Map()
-    for (const phase of profilePhases('full')) {
+    for (const phase of profilePhases('standard')) {
       const match = /^(\w+?)_(\w+)_(\d+)$/.exec(phase.key)
       if (!match) {
         continue
@@ -158,7 +152,7 @@ describe('time budgets', () => {
   // The reason this file exists in its current shape. A perf run that takes
   // longer than someone will wait measures nothing, because they stop running
   // it — so `standard` has a hard ceiling, and it is checked here rather than
-  // rediscovered on the clock. A step that will not fit belongs in `deep`.
+  // rediscovered on the clock.
   for (const [name, profile] of Object.entries(PROFILES)) {
     if (!profile.budgetMinutes) {
       continue
@@ -170,7 +164,7 @@ describe('time budgets', () => {
         `${name} projects ${check.projectedSeconds}s ` +
           `(plan ${check.planSeconds}s + ~${check.setupSeconds}s setup) ` +
           `against a ${check.limitSeconds}s budget — ` +
-          `${-check.marginSeconds}s over. Trim a ladder or move it to \`deep\`.`
+          `${-check.marginSeconds}s over. Trim a ladder or move the ceiling on purpose.`
       )
     })
   }
@@ -185,18 +179,6 @@ describe('time budgets', () => {
     assert.equal(check.projectedSeconds, check.planSeconds + SETUP_ALLOWANCE_SECONDS)
   })
 
-  test('deep keeps everything standard trims for time', () => {
-    // The trims are a scheduling decision, not a coverage decision. Anything
-    // standard drops has to still be reachable, or "we cut it to fit" quietly
-    // becomes "we stopped measuring it".
-    const stepsIn = (name) =>
-      new Set(profilePhases(name).map((phase) => phase.key))
-    const deep = stepsIn('deep')
-    for (const key of stepsIn('standard')) {
-      assert.ok(deep.has(key), `${key} runs in standard but not in deep`)
-    }
-    assert.ok(deep.size > stepsIn('standard').size)
-  })
 })
 
 describe('entrypoint.sh derives the same schedule this config does', () => {

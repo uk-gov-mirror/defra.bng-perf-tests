@@ -152,15 +152,12 @@ if [ ! -f "${JM_SCENARIOS}/ladders.sh" ]; then
 fi
 . "${JM_SCENARIOS}/ladders.sh"
 
-# Which steps run, and how deeply they sample. A profile never changes what the
-# plan CONTAINS — every step has a thread group either way — it sets thread
-# counts, and a step at 0 threads costs nothing and reserves no wall clock.
-#
-#   quick     the shape of the curve, for iterating on a change   (~5 min)
-#   standard  the contiguous journey ladder plus one step of
-#             every other question — the default                  (~14 min)
-#   full      every step in ladders.config.mjs                     (~33 min)
-#   soak      the mixed workload only, held for SOAK_DURATION_SECONDS
+# Which steps run, and how deeply they sample. There is exactly one profile —
+# `standard` (scenarios/ladders.config.mjs is the single source of what it
+# runs) — but the machinery stays name-driven so ladders.sh remains the only
+# authority on what exists. A profile never changes what the plan CONTAINS —
+# every step has a thread group either way — it sets thread counts, and a step
+# at 0 threads costs nothing and reserves no wall clock.
 PERF_PROFILE=${PERF_PROFILE:-${PERF_PROFILE_DEFAULT}}
 profile_is_known() {
   for known in ${PERF_PROFILE_NAMES}; do
@@ -215,10 +212,8 @@ SIZE_ALLOWANCE_XLARGE_SECONDS=${SIZE_ALLOWANCE_XLARGE_SECONDS:-26}
 # the window derivation needs them; they are still passed through as properties,
 # so the plan's own defaults stay the fallback for a direct JMeter run.
 #
-# The weights default from the ACTIVE PROFILE rather than from a fixed number,
-# because the size ramp sits in front of every ladder: at `quick` its 160s
-# default would be most of the run, and at `soak` it is 160s of unrelated load
-# before the clock even starts.
+# The weights default from the profile rather than from a fixed number, so
+# ladders.config.mjs stays the one place the ramp's depth is decided.
 SIZE_RAMP_THREADS=${SIZE_RAMP_THREADS:-1}
 SIZE_RAMP_LOOPS=${SIZE_RAMP_LOOPS:-1}
 SIZE_LOOPS_EVERYDAY=${SIZE_LOOPS_EVERYDAY:-$(profile_value SIZE_LOOPS everyday 20)}
@@ -270,8 +265,8 @@ SIZE_RAMP_DELAY_SECONDS=${SIZE_RAMP_DELAY_SECONDS:-$((PROBE_DELAY_SECONDS + PROB
 # clock. That is the same contract SIZE_RAMP_THREADS=0 already had, applied to
 # every step rather than to one phase.
 # Start from every phase zeroed, so a step the profile omits is inert rather
-# than falling back to the .jmx default (which is the STANDARD profile, and
-# would quietly run a step `quick` deliberately left out).
+# than falling back to the .jmx default (which would quietly run a step the
+# profile deliberately left out).
 for phase_key in ${ALL_PHASE_KEYS}; do
   eval "PHASE_USERS_${phase_key}=0"
   eval "PHASE_WINDOW_${phase_key}=0"
@@ -281,12 +276,10 @@ done
 eval "PROFILE_PHASE_LIST=\${PROFILE_PHASES_${PERF_PROFILE}}"
 for phase_key in ${PROFILE_PHASE_LIST}; do
   # The mixed workload is a workload rather than a staircase step, so it has no
-  # user count in the ladder tables and takes MIX_THREADS instead. Its window is
-  # SOAK_DURATION_SECONDS when that is set — which is what PERF_PROFILE=soak is.
+  # user count in the ladder tables and takes MIX_THREADS instead.
   if [ "${phase_key}" = "mixed" ]; then
     phase_users=${MIX_THREADS:-${MIXED_THREADS_DEFAULT}}
     eval "phase_window=\${PROFILE_WINDOW_${PERF_PROFILE}_mixed}"
-    phase_window=${SOAK_DURATION_SECONDS:-${phase_window}}
   else
     eval "phase_users=\${PROFILE_USERS_${PERF_PROFILE}_${phase_key}}"
     eval "phase_window=\${PROFILE_WINDOW_${PERF_PROFILE}_${phase_key}}"
@@ -955,7 +948,7 @@ if [ "${PROFILE_BUDGET_SECONDS}" -gt 0 ] && [ ${PROJECTED_TOTAL_SECONDS} -gt "${
   else
     echo "           Setup was within its allowance, so the plan itself is the overrun." >&2
   fi
-  echo "           PERF_PROFILE=quick is the short run; STAGE_UPLOADS=false skips staging entirely." >&2
+  echo "           STAGE_UPLOADS=false skips staging entirely for a narrower run." >&2
 fi
 set -x
 
