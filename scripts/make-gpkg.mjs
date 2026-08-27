@@ -51,28 +51,65 @@ const NO_TREES = 0
  * @param {{ seed?: number }} [options]
  * @returns {{ path: string, parcels: number, bytes: number, generationMs: number }}
  */
-export function makeGeoPackage(filePath, parcels, { seed } = {}) {
-  // The synthetic file is scratch: `deriveBaselineFromSynthetic` copies it and
-  // clears the proposed columns, so only the derived file is ever uploaded.
-  const syntheticPath = `${filePath}.synthetic`
+export function makeGeoPackage(filePath, parcels, options = {}) {
+  const { baseline } = makeGeoPackagePair(filePath, null, parcels, options)
+  return baseline
+}
+
+/**
+ * Write BOTH halves of a two-stage upload: the baseline, and the
+ * post-intervention file it pairs with.
+ *
+ * Synthetic mode emits ONE file carrying the baseline and the proposed state on
+ * every row — that file IS the post-intervention half — and
+ * `deriveBaselineFromSynthetic` copies it and clears the proposed columns to
+ * leave the baseline half. So the pair shares a redline, a parcel partition and
+ * every feature ref by construction, which is exactly what the backend needs:
+ * `/post-intervention/validate` reconciles the upload against the baseline
+ * already stored on the project, and a post-intervention file generated
+ * independently would share no refs with it and reconcile against nothing.
+ *
+ * Passing `piPath` as null throws the post-intervention half away, which is
+ * what {@link makeGeoPackage} does — it is scratch in that case, not an output.
+ *
+ * @param {string} baselinePath where to write the baseline half
+ * @param {string|null} piPath where to write the post-intervention half
+ * @param {number} parcels how many habitat parcels both halves should contain
+ * @param {{ seed?: number }} [options]
+ * @returns {{ baseline: object, postIntervention: object|null }}
+ */
+export function makeGeoPackagePair(baselinePath, piPath, parcels, { seed } = {}) {
+  // Without a post-intervention output the synthetic file is scratch, so it is
+  // written beside the baseline and removed in the `finally` below.
+  const syntheticPath = piPath ?? `${baselinePath}.synthetic`
   const startedAt = process.hrtime.bigint()
   rmSync(syntheticPath, { force: true })
-  rmSync(filePath, { force: true })
+  rmSync(baselinePath, { force: true })
   try {
     generateOne(syntheticPath, SITE_CENTRE, {
       numParcels: parcels,
       numTrees: NO_TREES,
       seed: seed ?? parcels
     })
-    deriveBaselineFromSynthetic(syntheticPath, filePath)
+    deriveBaselineFromSynthetic(syntheticPath, baselinePath)
+    const generationMs = Math.round(
+      Number(process.hrtime.bigint() - startedAt) / 1e6
+    )
+    return {
+      baseline: {
+        path: baselinePath,
+        parcels,
+        bytes: statSync(baselinePath).size,
+        generationMs
+      },
+      postIntervention: piPath
+        ? { path: piPath, parcels, bytes: statSync(piPath).size, generationMs }
+        : null
+    }
   } finally {
-    rmSync(syntheticPath, { force: true })
-  }
-  return {
-    path: filePath,
-    parcels,
-    bytes: statSync(filePath).size,
-    generationMs: Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6)
+    if (!piPath) {
+      rmSync(syntheticPath, { force: true })
+    }
   }
 }
 

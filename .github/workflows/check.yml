@@ -1,0 +1,42 @@
+name: Check
+
+# The plan's ladders are GENERATED (scripts/gen-scenario.mjs) and COMMITTED, so
+# they can go stale the moment someone edits scenarios/ladders.config.mjs
+# without re-running the generator — and a stale plan does not fail, it just
+# runs the wrong steps and reports them under the right names. That is the
+# failure this workflow exists to catch, alongside the schedule arithmetic and
+# the label contract between the generator and the summariser.
+#
+# It runs on pull requests and on main; publish.yml still owns the build.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    name: Tests and generated-plan freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # --ignore-scripts for the same reason the Dockerfile uses it: npm runs a
+      # `prepare` step for the git-pinned bng-library, which tries to build
+      # better-sqlite3 from source. Nothing under test needs the native binary —
+      # the GeoPackage generator is exercised by a real run, not by CI.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Check the committed plan matches its config
+        run: npm run check-scenario
+
+      - name: Test
+        run: npm test
