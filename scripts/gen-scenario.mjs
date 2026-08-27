@@ -31,15 +31,19 @@ import {
   DEFAULT_PHASE_GAP_SECONDS,
   DEFAULT_PROFILE,
   FETCH_RAMP,
-  GENERATED_BLOCK_START_SECONDS,
   LADDERS,
   MIXED_THREADS,
   MIX_DEFAULTS,
   PROFILES,
+  SETUP_ALLOWANCE_SECONDS,
   SIZE_LABELS,
+  budgetCheck,
+  generatedBlockStartSeconds,
   ladderSteps,
   profilePhases,
+  runSeconds,
   scheduleFrom,
+  sizeRampWindowSeconds,
   stepKey,
   stepLabel
 } from '../scenarios/ladders.config.mjs'
@@ -893,6 +897,7 @@ function renderLaddersSh() {
     `LADDER_SIZES="${SIZE_LABELS.join(' ')}"`,
     `MIXED_THREADS_DEFAULT=${MIXED_THREADS}`,
     `PHASE_GAP_SECONDS_DEFAULT=${DEFAULT_PHASE_GAP_SECONDS}`,
+    `SETUP_ALLOWANCE_SECONDS_DEFAULT=${SETUP_ALLOWANCE_SECONDS}`,
     '',
     '# Seconds allowed per fetch of each size. The fetch ramp is loop-count',
     '# driven, so entrypoint.sh re-derives its window from these after staging:',
@@ -911,15 +916,23 @@ function renderLaddersSh() {
 
   for (const [name, profile] of Object.entries(PROFILES)) {
     const phases = profilePhases(name)
-    const nominal = phases.reduce(
-      (total, phase) => total + phase.window + DEFAULT_PHASE_GAP_SECONDS,
-      0
-    )
+    const budget = budgetCheck(name)
     out.push(`# ── ${name} — ${profile.description}`)
-    out.push(`#    ${phases.length} phase(s), ~${Math.round(nominal / SECONDS_PER_MINUTE)} min of ladder time`)
+    out.push(
+      `#    ${phases.length} phase(s); plan ${runSeconds(name)}s` +
+        (budget
+          ? `, budget ${profile.budgetMinutes} min (projected ${budget.projectedSeconds}s incl. ~${SETUP_ALLOWANCE_SECONDS}s setup)`
+          : ', no budget')
+    )
+    out.push(`PROFILE_BUDGET_SECONDS_${name}=${budget ? budget.limitSeconds : 0}`)
+    out.push(`PROFILE_PLAN_SECONDS_${name}=${runSeconds(name)}`)
     out.push(`PROFILE_PHASES_${name}="${phases.map((p) => p.key).join(' ')}"`)
     for (const phase of phases) {
       out.push(`PROFILE_WINDOW_${name}_${phase.key}=${phase.window}`)
+      // Per-phase, because the drain a phase needs is about one in-flight
+      // request — five seconds after a one-second edit is four seconds of
+      // nothing, and across a 21-phase run that adds up to real wall clock.
+      out.push(`PROFILE_GAP_${name}_${phase.key}=${phase.gap}`)
       if (phase.users !== null) {
         out.push(`PROFILE_USERS_${name}_${phase.key}=${phase.users}`)
       }
@@ -963,8 +976,7 @@ function allPhaseKeys() {
 function defaultsForJmx() {
   const scheduled = scheduleFrom(
     profilePhases(DEFAULT_PROFILE),
-    GENERATED_BLOCK_START_SECONDS,
-    DEFAULT_PHASE_GAP_SECONDS
+    generatedBlockStartSeconds(DEFAULT_PROFILE)
   )
   const byKey = new Map(scheduled.map((phase) => [phase.key, phase]))
   return {
@@ -987,9 +999,7 @@ function defaultsForJmx() {
           )
         : 0,
     /** Wall clock the standard profile spends, for the header comment. */
-    endsAt: scheduled.length
-      ? scheduled.at(-1).delay + scheduled.at(-1).window
-      : GENERATED_BLOCK_START_SECONDS
+    endsAt: runSeconds(DEFAULT_PROFILE)
   }
 }
 function spliceGenerated(jmx, generated) {

@@ -4,6 +4,12 @@ set -x
 echo "run_id: $RUN_ID in $ENVIRONMENT"
 
 NOW=$(date +"%Y%m%d-%H%M%S")
+# Wall clock at task start. Everything before JMeter — minting a token, seeding,
+# staging four uploads through a virus scanner, building the prepared pools — is
+# time the person waiting is paying for, and none of it is in the plan's own
+# timeline. It is measured rather than assumed so the budget check below is
+# against what actually happened.
+TASK_STARTED_AT=$(date +%s)
 
 if [ -z "${JM_HOME}" ]; then
   JM_HOME=/opt/perftest
@@ -234,6 +240,12 @@ SIZE_RAMP_DURATION_SECONDS=${SIZE_RAMP_DURATION_SECONDS:-$(( SIZE_RAMP_PASS_SECO
 
 # Dead time between phases, so the previous step's in-flight requests drain before
 # the next one starts and its latencies are not charged to the wrong phase.
+#
+# Set explicitly, it applies to EVERY phase — asking for a uniform gap, and from
+# there the arithmetic is yours. Left unset, each phase gets its own drain time
+# derived from what one of its iterations costs, and this value is used only at
+# the boundaries around the hand-written phases.
+PHASE_GAP_SECONDS_OVERRIDE=${PHASE_GAP_SECONDS}
 PHASE_GAP_SECONDS=${PHASE_GAP_SECONDS:-${PHASE_GAP_SECONDS_DEFAULT}}
 
 # Each phase starts a gap after the previous one ends. An explicitly-set delay is
@@ -306,6 +318,7 @@ done
 derive_ladder_delays() {
   PHASE_CURSOR=$((SIZE_RAMP_DELAY_SECONDS + SIZE_RAMP_DURATION_SECONDS + PHASE_GAP_SECONDS))
   LADDER_PHASE_COUNT=0
+  last_gap=${PHASE_GAP_SECONDS}
   for phase_key in ${PROFILE_PHASE_LIST}; do
     eval "phase_users=\${PHASE_USERS_${phase_key}}"
     eval "phase_window=\${PHASE_WINDOW_${phase_key}}"
@@ -313,14 +326,22 @@ derive_ladder_delays() {
       eval "PHASE_DELAY_${phase_key}=0"
       continue
     fi
+    # Each phase's own drain time — roughly one in-flight request — unless the
+    # operator set PHASE_GAP_SECONDS, which asks for a uniform one.
+    if [ -n "${PHASE_GAP_SECONDS_OVERRIDE}" ]; then
+      phase_gap=${PHASE_GAP_SECONDS_OVERRIDE}
+    else
+      eval "phase_gap=\${PROFILE_GAP_${PERF_PROFILE}_${phase_key}:-${PHASE_GAP_SECONDS}}"
+    fi
     eval "PHASE_DELAY_${phase_key}=${PHASE_CURSOR}"
-    PHASE_CURSOR=$((PHASE_CURSOR + phase_window + PHASE_GAP_SECONDS))
+    PHASE_CURSOR=$((PHASE_CURSOR + phase_window + phase_gap))
+    last_gap=${phase_gap}
     LADDER_PHASE_COUNT=$((LADDER_PHASE_COUNT + 1))
   done
 
   # The last gap is dead air after the final phase, so the run ends a gap early.
   if [ ${LADDER_PHASE_COUNT} -gt 0 ]; then
-    RUN_END_SECONDS=$((PHASE_CURSOR - PHASE_GAP_SECONDS))
+    RUN_END_SECONDS=$((PHASE_CURSOR - last_gap))
   else
     RUN_END_SECONDS=$((SIZE_RAMP_DELAY_SECONDS + SIZE_RAMP_DURATION_SECONDS))
   fi
@@ -474,7 +495,13 @@ echo "  create load:         ${CREATE_THREADS}t x ${CREATE_LOOPS}L x ${CREATE_PA
 echo "  create growth:       up to ~${GROWTH_KIB} KiB added by this run (bng.projects + append-only bng.audit_log — NOT reclaimable; excludes upload phases)"
 echo "  nominal run:         ${RUN_END_SECONDS}s (~$((RUN_END_SECONDS / 60)) min)"
 echo "  phase schedule:      everyday 0-${EVERYDAY_PHASE_DURATION_SECONDS}s | probe ${PROBE_DELAY_SECONDS}s+${PROBE_DURATION_SECONDS}s | ramp ${SIZE_RAMP_DELAY_SECONDS}s+${SIZE_RAMP_DURATION_SECONDS}s"
-echo "  profile:             ${PERF_PROFILE} — ${LADDER_PHASE_COUNT} ladder phase(s) after the size ramp"
+eval "BANNER_BUDGET_SECONDS=\${PROFILE_BUDGET_SECONDS_${PERF_PROFILE}:-0}"
+if [ "${BANNER_BUDGET_SECONDS}" -gt 0 ]; then
+  BANNER_BUDGET="budget $((BANNER_BUDGET_SECONDS / 60)) min incl. setup"
+else
+  BANNER_BUDGET="no budget — this profile is meant to be long"
+fi
+echo "  profile:             ${PERF_PROFILE} — ${LADDER_PHASE_COUNT} ladder phase(s), ${BANNER_BUDGET}"
 echo "                       ${LADDER_SCHEDULE_SUMMARY}"
 echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_EVERYDAY}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (everyday/busy/large/xlarge)"
 echo "                       derived from ${SIZE_ALLOWANCE_EVERYDAY_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
@@ -901,6 +928,37 @@ for upload_label in ${LADDER_SIZES}; do
   SCENARIO_PROPS="${SCENARIO_PROPS} -JfetchLoops_${upload_label}=${fetch_loops}"
 done
 
+# ── The time budget, checked against the setup that actually happened ───────
+#
+# `standard` exists to be a run someone will sit and wait for, so it carries a
+# hard ceiling (PROFILE_BUDGET_SECONDS_*, enforced at design time by the test
+# suite against an ESTIMATED setup cost). This is the same check against the
+# measured one: the estimate cannot know how slow this environment's virus
+# scanner is today, and staging is most of the setup.
+#
+# It warns rather than fails, and says which knob to reach for. Failing here
+# would throw away a run that is already three-quarters set up, over a ceiling
+# that is a preference rather than a correctness property.
+SETUP_ELAPSED_SECONDS=$(( $(date +%s) - TASK_STARTED_AT ))
+eval "PROFILE_BUDGET_SECONDS=\${PROFILE_BUDGET_SECONDS_${PERF_PROFILE}:-0}"
+PROJECTED_TOTAL_SECONDS=$((SETUP_ELAPSED_SECONDS + RUN_END_SECONDS))
+set +x
+echo "▸ setup took ${SETUP_ELAPSED_SECONDS}s; the plan runs for ${RUN_END_SECONDS}s — projected total ${PROJECTED_TOTAL_SECONDS}s (~$((PROJECTED_TOTAL_SECONDS / 60)) min)"
+if [ "${PROFILE_BUDGET_SECONDS}" -gt 0 ] && [ ${PROJECTED_TOTAL_SECONDS} -gt "${PROFILE_BUDGET_SECONDS}" ]; then
+  SETUP_OVERRUN_SECONDS=0
+  if [ ${SETUP_ELAPSED_SECONDS} -gt "${SETUP_ALLOWANCE_SECONDS_DEFAULT}" ]; then
+    SETUP_OVERRUN_SECONDS=$((SETUP_ELAPSED_SECONDS - SETUP_ALLOWANCE_SECONDS_DEFAULT))
+  fi
+  echo "▸ WARNING: that is over the '${PERF_PROFILE}' profile's ${PROFILE_BUDGET_SECONDS}s budget by $((PROJECTED_TOTAL_SECONDS - PROFILE_BUDGET_SECONDS))s." >&2
+  if [ ${SETUP_OVERRUN_SECONDS} -gt 0 ]; then
+    echo "           Setup ran ${SETUP_OVERRUN_SECONDS}s past its ${SETUP_ALLOWANCE_SECONDS_DEFAULT}s allowance — usually a slow virus scan." >&2
+  else
+    echo "           Setup was within its allowance, so the plan itself is the overrun." >&2
+  fi
+  echo "           PERF_PROFILE=quick is the short run; STAGE_UPLOADS=false skips staging entirely." >&2
+fi
+set -x
+
 REPORTFILE=${NOW}-perftest-${SCENARIO}-report.csv
 LOGFILE=${JM_LOGS}/perftest-${SCENARIO}.log
 
@@ -970,6 +1028,10 @@ set +x
 echo "──────────────────────────── bng-perf-tests summary ───────────────────────────────"
 echo "  run_id: ${RUN_ID:-<unset>} (environment ${ENVIRONMENT:-<unset>})"
 echo "  ${SCENARIO}: RAN — report published to ${RESULTS_OUTPUT_S3_PATH}"
+echo "  profile ${PERF_PROFILE}: ${SETUP_ELAPSED_SECONDS}s setup + ${RUN_END_SECONDS}s plan = $(( $(date +%s) - TASK_STARTED_AT ))s total (~$(( ($(date +%s) - TASK_STARTED_AT) / 60 )) min)"
+echo "  Setup is the half the plan's own timeline does not include. If it is well"
+echo "  under ${SETUP_ALLOWANCE_SECONDS_DEFAULT}s here, SETUP_ALLOWANCE_SECONDS in scenarios/ladders.config.mjs"
+echo "  can come down and the ladders can have the difference."
 echo "  NOTE: red assertions in the report (project-list by design until the BMD-933 backend"
 echo "        fix lands, or a slow/down frontend on the home-page group) do NOT gate the run."
 echo "────────────────────────────────────────────────────────────────────────────────────"

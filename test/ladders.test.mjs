@@ -17,11 +17,12 @@ import { join } from 'node:path'
 import { test, describe } from 'node:test'
 
 import {
-  DEFAULT_PHASE_GAP_SECONDS,
   LADDERS,
   PROFILES,
+  SETUP_ALLOWANCE_SECONDS,
   SIZE_LABELS,
   WINDOW_BOUNDS,
+  budgetCheck,
   ladderSteps,
   profilePhases,
   scheduleFrom,
@@ -114,17 +115,13 @@ describe('profiles', () => {
 describe('schedule', () => {
   test('phases never overlap, and each starts a gap after the last ended', () => {
     for (const name of Object.keys(PROFILES)) {
-      const scheduled = scheduleFrom(
-        profilePhases(name),
-        100,
-        DEFAULT_PHASE_GAP_SECONDS
-      )
+      const scheduled = scheduleFrom(profilePhases(name), 100)
       for (let i = 1; i < scheduled.length; i++) {
         const previous = scheduled[i - 1]
         const current = scheduled[i]
         assert.equal(
           current.delay,
-          previous.delay + previous.window + DEFAULT_PHASE_GAP_SECONDS,
+          previous.delay + previous.window + previous.gap,
           `${name}: ${current.key} does not start a gap after ${previous.key}`
         )
         assert.ok(
@@ -154,6 +151,51 @@ describe('schedule', () => {
         `${group} does not climb`
       )
     }
+  })
+})
+
+describe('time budgets', () => {
+  // The reason this file exists in its current shape. A perf run that takes
+  // longer than someone will wait measures nothing, because they stop running
+  // it — so `standard` has a hard ceiling, and it is checked here rather than
+  // rediscovered on the clock. A step that will not fit belongs in `deep`.
+  for (const [name, profile] of Object.entries(PROFILES)) {
+    if (!profile.budgetMinutes) {
+      continue
+    }
+    test(`${name} fits its ${profile.budgetMinutes}-minute budget`, () => {
+      const check = budgetCheck(name)
+      assert.ok(
+        check.fits,
+        `${name} projects ${check.projectedSeconds}s ` +
+          `(plan ${check.planSeconds}s + ~${check.setupSeconds}s setup) ` +
+          `against a ${check.limitSeconds}s budget — ` +
+          `${-check.marginSeconds}s over. Trim a ladder or move it to \`deep\`.`
+      )
+    })
+  }
+
+  test('the budget accounts for setup, not just the JMeter plan', () => {
+    // runSeconds is the plan's nominal length. The task someone waits for also
+    // mints a token, seeds, stages four uploads through a virus scanner and
+    // publishes a report — and staging is the bulk of it. A budget checked
+    // against the plan alone would pass here and overrun in practice.
+    const check = budgetCheck('standard')
+    assert.ok(check.projectedSeconds > check.planSeconds)
+    assert.equal(check.projectedSeconds, check.planSeconds + SETUP_ALLOWANCE_SECONDS)
+  })
+
+  test('deep keeps everything standard trims for time', () => {
+    // The trims are a scheduling decision, not a coverage decision. Anything
+    // standard drops has to still be reachable, or "we cut it to fit" quietly
+    // becomes "we stopped measuring it".
+    const stepsIn = (name) =>
+      new Set(profilePhases(name).map((phase) => phase.key))
+    const deep = stepsIn('deep')
+    for (const key of stepsIn('standard')) {
+      assert.ok(deep.has(key), `${key} runs in standard but not in deep`)
+    }
+    assert.ok(deep.size > stepsIn('standard').size)
   })
 })
 
@@ -195,18 +237,18 @@ describe('entrypoint.sh derives the same schedule this config does', () => {
       // than assuming the .jmx default. What is being compared is the SHAPE:
       // the same phases, the same windows, the same gaps between them.
       const anchor = fromShell.length ? fromShell[0].delay : 0
-      const fromConfig = scheduleFrom(
-        profilePhases(name),
-        anchor,
-        DEFAULT_PHASE_GAP_SECONDS
-      ).map(({ key, users, window, delay }) => ({
+      // No gap override: each phase carries its own drain time, and the point of
+      // this test is that the shell honours the same ones.
+      const fromConfig = scheduleFrom(profilePhases(name), anchor).map(
+        ({ key, users, window, delay }) => ({
         key,
         // The mixed workload has no user count in the ladder tables; the shell
         // gives it MIXED_THREADS.
-        users: users ?? fromShell.find((p) => p.key === key)?.users ?? 0,
-        window,
-        delay
-      }))
+          users: users ?? fromShell.find((p) => p.key === key)?.users ?? 0,
+          window,
+          delay
+        })
+      )
 
       assert.deepEqual(fromShell, fromConfig)
     })

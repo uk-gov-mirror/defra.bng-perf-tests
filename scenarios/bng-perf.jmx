@@ -890,8 +890,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_1,24)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_1,220)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_1,20)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_1,138)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1085,8 +1085,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_2,12)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_2,249)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_2,10)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_2,162)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1280,8 +1280,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_3,3)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_3,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_3,266)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_3,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_3,176)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1475,8 +1475,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_4,4)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_4,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_4,281)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_4,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_4,188)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1670,8 +1670,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_5,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_5,296)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_5,200)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1865,8 +1865,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_6,6)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_6,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_6,311)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_6,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_6,212)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2060,8 +2060,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_7,7)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_7,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_7,326)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_7,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_7,224)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2255,8 +2255,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_8,8)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_8,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_8,341)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_8,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_8,236)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2450,8 +2450,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_9,9)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_9,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_9,356)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_9,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_9,248)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2645,8 +2645,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_10,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_10,371)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_10,260)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -3620,8 +3620,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_1,45)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_1,386)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_1,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_1,272)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -3812,11 +3812,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_2,2)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_2,0)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_2,42)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_2,436)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_2,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_2,0)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -4010,8 +4010,8 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_journey_large_3,3)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_3,28)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_3,483)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_large_3,24)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_large_3,307)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5371,11 +5371,11 @@ This isolates the service&apos;s own validate cost from the uploader&apos;s — 
 bytes are already in S3 and already scanned. It is NOT N people uploading
 N files; the upload journey ladder is that, and the two sit next to each
 other in the report so the difference between them is the uploader.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_1,1)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_1,0)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_1,45)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_1,516)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_1,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_1,0)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -5779,7 +5779,7 @@ other in the report so the difference between them is the uploader.</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
         <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_5,12)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_5,566)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_5,336)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6081,8 +6081,8 @@ other in the report so the difference between them is the uploader.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_revalidate_large_20,20)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_20,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_20,583)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_revalidate_large_20,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_revalidate_large_20,353)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6485,8 +6485,8 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_1,20)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_1,598)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_1,15)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_1,366)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6685,8 +6685,8 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_5,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_5,623)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_5,386)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7189,8 +7189,8 @@ nothing around it is.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_1,20)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_1,638)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_1,12)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_1,399)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7280,11 +7280,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_2,2)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_2,0)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_2,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_2,663)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_2,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_2,0)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7471,8 +7471,8 @@ nothing around it is.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_5,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_5,678)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_5,412)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7938,11 +7938,11 @@ project row, so these serialise and eventually 409 with &quot;Another edit for
 this project is in progress&quot;. The number to read is the 409 RATE, not the
 latency — 409 is a correct answer here, so it is asserted as acceptable
 and counted separately in the summary rather than painting the report red.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_2,2)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_2,0)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_editContention_2,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_2,693)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_editContention_2,30)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_2,0)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8119,8 +8119,8 @@ and counted separately in the summary rather than painting the report red.</stri
         <stringProp name="ThreadGroup.num_threads">${__P(users_editContention_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_editContention_5,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_5,708)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_editContention_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_editContention_5,421)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8301,8 +8301,8 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_fetchRamp,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_fetchRamp,62)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_fetchRamp,723)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_fetchRamp,27)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_fetchRamp,430)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -8339,7 +8339,7 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
         <hashTree/>
         <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="everyday x N">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">${__P(fetchLoops_everyday,10)}</stringProp>
+          <stringProp name="LoopController.loops">${__P(fetchLoops_everyday,5)}</stringProp>
         </LoopController>
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="fetch everyday project (GET /projects/{id})">
@@ -8371,7 +8371,7 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
         </hashTree>
         <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="busy x N">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">${__P(fetchLoops_busy,6)}</stringProp>
+          <stringProp name="LoopController.loops">${__P(fetchLoops_busy,3)}</stringProp>
         </LoopController>
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="fetch busy project (GET /projects/{id})">
@@ -8403,7 +8403,7 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
         </hashTree>
         <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="large x N">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">${__P(fetchLoops_large,4)}</stringProp>
+          <stringProp name="LoopController.loops">${__P(fetchLoops_large,2)}</stringProp>
         </LoopController>
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="fetch large project (GET /projects/{id})">
@@ -8435,7 +8435,7 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
         </hashTree>
         <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="xlarge x N">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">${__P(fetchLoops_xlarge,3)}</stringProp>
+          <stringProp name="LoopController.loops">${__P(fetchLoops_xlarge,1)}</stringProp>
         </LoopController>
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="fetch xlarge project (GET /projects/{id})">
@@ -8489,8 +8489,8 @@ that, every revalidate would 404 the edits behind it.</stringProp>
         <stringProp name="ThreadGroup.num_threads">${__P(users_mixed,8)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_mixed,45)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_mixed,790)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_mixed,25)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_mixed,462)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
