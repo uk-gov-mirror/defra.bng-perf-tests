@@ -3,7 +3,7 @@
  *
  * The JMeter dashboard is the detailed report, but it answers "what were the
  * numbers" rather than "is this a problem". This prints the shape a PM needs:
- * what an everyday upload costs, how that changes as files get bigger, how it
+ * what a normal upload costs, how that changes as files get bigger, how it
  * changes as more people upload at once, and — the one that decides whether any
  * of it matters — what an ordinary user was experiencing at the same time.
  *
@@ -155,7 +155,7 @@ function isMixed(label) {
 
 // The order the size labels are meant to be read in. A ramp presented out of
 // order is not a ramp — it has to climb down the page.
-const SIZE_ORDER = ['everyday', 'busy', 'large', 'xlarge']
+const SIZE_ORDER = ['normal', 'busy', 'large', 'xlarge']
 
 /**
  * Sort rows the way a staircase has to be read: by file size, then by
@@ -163,7 +163,7 @@ const SIZE_ORDER = ['everyday', 'busy', 'large', 'xlarge']
  *
  * This used to key on the user count alone, which was right when every ladder
  * ran one fixture. Now that they run per size, that ordering interleaves them —
- * `(large) @ 1 user(s)` would sort above `(everyday) @ 3 user(s)` and the table
+ * `(large) @ 1 user(s)` would sort above `(normal) @ 3 user(s)` and the table
  * would climb twice with no way to see where one ladder ended. Size is
  * therefore the major key, and it is padded so a two-digit user count cannot
  * carry a row into the next size's range.
@@ -207,7 +207,7 @@ const WINDOW_EXHAUSTED_PERCENT = 90
  * Did the size ramp actually complete its weighted pass?
  *
  * The ramp is loop-count driven inside a duration guard, so its sample counts
- * are meant to be EXACT — 20 everyday, 8 busy, 3 large, 2 xlarge. When the pass
+ * are meant to be EXACT — 20 normal, 8 busy, 3 large, 2 xlarge. When the pass
  * overruns the guard the scheduler cuts the thread group off wherever it has
  * reached, and because the pass runs smallest-first what it loses is the tail:
  * `large` and `xlarge`. Those sizes then have no rows at all, which reads
@@ -368,7 +368,7 @@ function journeyTotals(samples) {
 
 /**
  * The sampler label a journey leg carries:
- * `journey (everyday) @ 3 user(s): validate incl virus scan`.
+ * `journey (normal) @ 3 user(s): validate incl virus scan`.
  */
 const JOURNEY_LABEL = /^journey \((\w+)\) @ (\d+) user\(s\): (.+)$/
 

@@ -83,7 +83,7 @@ const HTTP_BAD_REQUEST = 400
  * The file sizes the run profiles, as `label:parcels` pairs.
  *
  * The defaults bracket reality deliberately. Real BNG files in the reference
- * corpus top out around 80 parcels / 124 KB, so `everyday` is what a user
+ * corpus top out around 80 parcels / 124 KB, so `normal` is what a user
  * actually submits; the larger steps are there to find where the service stops
  * coping, not because anyone uploads them today.
  *
@@ -94,12 +94,12 @@ const HTTP_BAD_REQUEST = 400
  * every split: generation is roughly quadratic, so 5 000 parcels takes ~1.6 s
  * and 12 000 takes ~9 s.
  */
-const DEFAULT_SIZES = 'everyday:80,busy:800,large:5000,xlarge:12000'
+const DEFAULT_SIZES = 'normal:80,busy:800,large:5000,xlarge:12000'
 
 /**
  * The size labels the JMeter plan is wired to.
  *
- * `scenarios/bng-perf.jmx` reads `uploadId_everyday` / `_busy` / `_large` /
+ * `scenarios/bng-perf.jmx` reads `uploadId_normal` / `_busy` / `_large` /
  * `_xlarge` by name, one hard-coded sampler each, and every concurrency phase
  * reads `uploadId_large`. So UPLOAD_SIZES sets how big each step is — that is
  * what it is for — but not what the steps are called. A label the plan does not
@@ -108,7 +108,7 @@ const DEFAULT_SIZES = 'everyday:80,busy:800,large:5000,xlarge:12000'
  * segment. Neither shows up as anything but bad numbers in the report, so both
  * are rejected here, before a run is spent on them.
  */
-const PLAN_SIZE_LABELS = ['everyday', 'busy', 'large', 'xlarge']
+const PLAN_SIZE_LABELS = ['normal', 'busy', 'large', 'xlarge']
 
 /**
  * Labels become `-JuploadId_<label>=` arguments, and entrypoint.sh deliberately
@@ -316,7 +316,7 @@ async function stageOneSize({ label, parcels }) {
 }
 
 /**
- * Parse `label:count` pairs, e.g. `everyday:10,large:5`.
+ * Parse `label:count` pairs, e.g. `normal:10,large:5`.
  *
  * Shares the strictness of parseSizes for the same reason: a silently dropped
  * entry leaves a phase with no pool and no explanation anywhere.

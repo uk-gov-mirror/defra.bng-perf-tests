@@ -335,7 +335,7 @@ function revalidateStep(step, defaults) {
   // "on", not a comma — labels land in the results CSV, where a comma splits
   // the row for every naive consumer.
   const label = `validation cost vs concurrency: ${step.users} user(s) on one ${step.size} upload`
-  const budget = step.size === 'everyday' ? 'everydayBudgetMs' : 'validateBudgetMs'
+  const budget = step.size === 'normal' ? 'normalBudgetMs' : 'validateBudgetMs'
   return lines(
     threadGroup({
       name: `Validation cost vs concurrency (${step.size}) @ ${step.users} user(s)`,
@@ -485,7 +485,7 @@ ${UPLOAD_LEG}</hashTree>`
 }
 
 function journeyValidateLeg(step, suffix) {
-  const budget = step.size === 'everyday' ? 'journeyBudgetMs' : 'journeyLargeBudgetMs'
+  const budget = step.size === 'normal' ? 'journeyBudgetMs' : 'journeyLargeBudgetMs'
   return jsonSampler(UPLOAD_LEG, {
     name: `journey ${suffix}: validate incl virus scan`,
     path: '/baseline/validate/${journeyUploadId}',
@@ -574,7 +574,7 @@ function piStep(step, defaults) {
  */
 function editStep(step, { contention }, defaults) {
   const key = stepKey(step)
-  const size = step.size ?? 'everyday'
+  const size = step.size ?? 'normal'
   const suffix = contention
     ? `@ ${step.users} user(s)`
     : stepLabel(step)
@@ -761,8 +761,8 @@ function mixedWorkloadGroup(defaults) {
     authHeaders(BODY),
     csvDataSet(BODY, {
       name: 'Prepared project pool',
-      fileProp: 'preparedCsv_everyday',
-      fileDefault: '/opt/perftest/stage/prepared-everyday.csv',
+      fileProp: 'preparedCsv_normal',
+      fileDefault: '/opt/perftest/stage/prepared-normal.csv',
       variables:
         'preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition',
       quoted: PREPARED_CSV_IS_QUOTED
@@ -813,7 +813,7 @@ function mixedWorkloadGroup(defaults) {
       MIX_DEFAULTS.validate,
       jsonSampler(CHILD, {
         name: 'mixed: revalidate an upload (POST /baseline/validate/{uploadId})',
-        path: '/baseline/validate/${__P(uploadId_everyday,)}',
+        path: '/baseline/validate/${__P(uploadId_normal,)}',
         method: 'POST',
         body: '{"projectId":"${preparedProjectId}"}',
         timeoutProp: 'validateResponseTimeoutMs',

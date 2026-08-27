@@ -203,7 +203,7 @@ PROBE_BASELINE_SECONDS=${PROBE_BASELINE_SECONDS:-25}
 # ramp simply ends; the cost of being generous is dead air before the next
 # phase, which is why summarise-run.mjs reports how much of the window the ramp
 # actually used. Tighten them from that number after the first real run.
-SIZE_ALLOWANCE_EVERYDAY_SECONDS=${SIZE_ALLOWANCE_EVERYDAY_SECONDS:-2}
+SIZE_ALLOWANCE_NORMAL_SECONDS=${SIZE_ALLOWANCE_NORMAL_SECONDS:-2}
 SIZE_ALLOWANCE_BUSY_SECONDS=${SIZE_ALLOWANCE_BUSY_SECONDS:-4}
 SIZE_ALLOWANCE_LARGE_SECONDS=${SIZE_ALLOWANCE_LARGE_SECONDS:-12}
 SIZE_ALLOWANCE_XLARGE_SECONDS=${SIZE_ALLOWANCE_XLARGE_SECONDS:-26}
@@ -216,12 +216,12 @@ SIZE_ALLOWANCE_XLARGE_SECONDS=${SIZE_ALLOWANCE_XLARGE_SECONDS:-26}
 # ladders.config.mjs stays the one place the ramp's depth is decided.
 SIZE_RAMP_THREADS=${SIZE_RAMP_THREADS:-1}
 SIZE_RAMP_LOOPS=${SIZE_RAMP_LOOPS:-1}
-SIZE_LOOPS_EVERYDAY=${SIZE_LOOPS_EVERYDAY:-$(profile_value SIZE_LOOPS everyday 20)}
+SIZE_LOOPS_NORMAL=${SIZE_LOOPS_NORMAL:-$(profile_value SIZE_LOOPS normal 20)}
 SIZE_LOOPS_BUSY=${SIZE_LOOPS_BUSY:-$(profile_value SIZE_LOOPS busy 8)}
 SIZE_LOOPS_LARGE=${SIZE_LOOPS_LARGE:-$(profile_value SIZE_LOOPS large 3)}
 SIZE_LOOPS_XLARGE=${SIZE_LOOPS_XLARGE:-$(profile_value SIZE_LOOPS xlarge 2)}
 
-SIZE_RAMP_PASS_SECONDS=$(( SIZE_LOOPS_EVERYDAY * SIZE_ALLOWANCE_EVERYDAY_SECONDS \
+SIZE_RAMP_PASS_SECONDS=$(( SIZE_LOOPS_NORMAL * SIZE_ALLOWANCE_NORMAL_SECONDS \
   + SIZE_LOOPS_BUSY * SIZE_ALLOWANCE_BUSY_SECONDS \
   + SIZE_LOOPS_LARGE * SIZE_ALLOWANCE_LARGE_SECONDS \
   + SIZE_LOOPS_XLARGE * SIZE_ALLOWANCE_XLARGE_SECONDS ))
@@ -383,7 +383,7 @@ PROBE_DURATION_SECONDS_OVERRIDE=${PROBE_DURATION_SECONDS}
 derive_ladder_delays
 
 # A one-line, human-readable form of the schedule the walk just derived —
-# "journey_everyday_1@1u/24s, journey_everyday_2@2u/12s, …" — so a run can be
+# "journey_normal_1@1u/24s, journey_normal_2@2u/12s, …" — so a run can be
 # triaged from the first screen of logs without counting delays by hand.
 LADDER_SCHEDULE_SUMMARY=""
 for phase_key in ${PROFILE_PHASE_LIST}; do
@@ -437,8 +437,8 @@ for upload_label in ${LADDER_SIZES}; do
     esac
   done
 
-  # The mixed workload reads the everyday pool, one project per thread.
-  if [ "${upload_label}" = "everyday" ] && [ "${PHASE_USERS_mixed:-0}" -gt ${prepared_needed} ]; then
+  # The mixed workload reads the normal pool, one project per thread.
+  if [ "${upload_label}" = "normal" ] && [ "${PHASE_USERS_mixed:-0}" -gt ${prepared_needed} ]; then
     prepared_needed=${PHASE_USERS_mixed}
   fi
   # The fetch ramp only needs ONE project of each size it loops over.
@@ -447,7 +447,7 @@ for upload_label in ${LADDER_SIZES}; do
     prepared_needed=1
   fi
   # The contention ladder edits ONE project, and any prepared one will do.
-  if [ "${upload_label}" = "everyday" ] && [ ${prepared_needed} -eq 0 ]; then
+  if [ "${upload_label}" = "normal" ] && [ ${prepared_needed} -eq 0 ]; then
     for phase_key in ${ALL_PHASE_KEYS}; do
       case "${phase_key}" in
         editContention_*)
@@ -496,14 +496,14 @@ else
 fi
 echo "  profile:             ${PERF_PROFILE} — ${LADDER_PHASE_COUNT} ladder phase(s), ${BANNER_BUDGET}"
 echo "                       ${LADDER_SCHEDULE_SUMMARY}"
-echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_EVERYDAY}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (everyday/busy/large/xlarge)"
-echo "                       derived from ${SIZE_ALLOWANCE_EVERYDAY_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
+echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_NORMAL}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (normal/busy/large/xlarge)"
+echo "                       derived from ${SIZE_ALLOWANCE_NORMAL_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
 echo "  stage uploads:       ${STAGE_UPLOADS}"
 echo "  prepared pools:      ${PREPARED_SIZES:-<none>} (projects pre-loaded with a baseline, for the edit/fetch/post-intervention groups)"
 echo "  post-intervention:   ${PI_SIZES:-<none>}"
 if [ "${STAGE_UPLOADS}" = "true" ]; then
   echo "  cdp-uploader:        ${CDP_UPLOADER_URL}"
-  echo "  upload sizes:        ${UPLOAD_SIZES:-<defaults: everyday,busy,large,xlarge>}"
+  echo "  upload sizes:        ${UPLOAD_SIZES:-<defaults: normal,busy,large,xlarge>}"
 fi
 echo "────────────────────────────────────────────────────────────────────────────────────"
 set -x
@@ -688,7 +688,7 @@ disable_phases_matching() {
 #                                                   them and a feature to edit
 #   edit contention         contentionProjectId   — one project, many features
 #   fetch ramp              sizedProjectId_<size> — a project of that size
-#   mixed                   prepared-everyday.csv + uploadId_everyday
+#   mixed                   prepared-normal.csv + uploadId_normal
 disable_unstaged_phases() {
   # Nothing that touches an upload or a project pool can run without staging.
   if [ "${STAGE_UPLOADS}" != "true" ]; then
@@ -699,7 +699,7 @@ disable_unstaged_phases() {
     for upload_label in ${LADDER_SIZES}; do
       eval "FETCH_LOOPS_${upload_label}=0"
     done
-    SIZE_LOOPS_EVERYDAY=0
+    SIZE_LOOPS_NORMAL=0
     SIZE_LOOPS_BUSY=0
     SIZE_LOOPS_LARGE=0
     SIZE_LOOPS_XLARGE=0
@@ -711,7 +711,7 @@ disable_unstaged_phases() {
     if ! staged_upload "${upload_label}"; then
       echo "▸ no staged upload for '${upload_label}' — skipping its size-ramp step and revalidate ladder" >&2
       case "${upload_label}" in
-        everyday) SIZE_LOOPS_EVERYDAY=0 ;;
+        normal) SIZE_LOOPS_NORMAL=0 ;;
         busy) SIZE_LOOPS_BUSY=0 ;;
         large) SIZE_LOOPS_LARGE=0 ;;
         xlarge) SIZE_LOOPS_XLARGE=0 ;;
@@ -753,11 +753,11 @@ disable_unstaged_phases() {
     disable_phases_matching "editContention_"
   fi
 
-  # The mixed workload reads the prepared pool and revalidates the everyday
+  # The mixed workload reads the prepared pool and revalidates the normal
   # upload, so it needs both. It is the one group that would otherwise fail
   # halfway through its weights rather than not run at all.
-  if ! staged_prop preparedCsv_everyday || ! staged_upload everyday; then
-    echo "▸ mixed workload needs the everyday prepared pool and upload — skipping it" >&2
+  if ! staged_prop preparedCsv_normal || ! staged_upload normal; then
+    echo "▸ mixed workload needs the normal prepared pool and upload — skipping it" >&2
     PHASE_USERS_mixed=0
   fi
 
@@ -839,7 +839,7 @@ add_prop probeThreads "${PROBE_THREADS}"
 add_prop probeThinkMs "${PROBE_THINK_MS}"
 add_prop probeMaxLatencyMs "${PROBE_MAX_LATENCY_MS}"
 add_prop validateBudgetMs "${VALIDATE_BUDGET_MS}"
-add_prop everydayBudgetMs "${EVERYDAY_BUDGET_MS}"
+add_prop normalBudgetMs "${NORMAL_BUDGET_MS}"
 add_prop validateResponseTimeoutMs "${VALIDATE_RESPONSE_TIMEOUT_MS}"
 add_prop sizeRampDelaySeconds "${SIZE_RAMP_DELAY_SECONDS}"
 add_prop sizeRampDurationSeconds "${SIZE_RAMP_DURATION_SECONDS}"
@@ -897,7 +897,7 @@ disable_unstaged_phases
 derive_ladder_delays
 add_prop probeDurationSeconds "${PROBE_DURATION_SECONDS}"
 
-add_prop sizeLoopsEveryday "${SIZE_LOOPS_EVERYDAY}"
+add_prop sizeLoopsNormal "${SIZE_LOOPS_NORMAL}"
 add_prop sizeLoopsBusy "${SIZE_LOOPS_BUSY}"
 add_prop sizeLoopsLarge "${SIZE_LOOPS_LARGE}"
 add_prop sizeLoopsXlarge "${SIZE_LOOPS_XLARGE}"
@@ -978,7 +978,7 @@ set -x
 # an absent row.
 if [ -f "${REPORTFILE}" ]; then
   set +x
-  SIZE_RAMP_EXPECTED="everyday:$(( SIZE_LOOPS_EVERYDAY * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
+  SIZE_RAMP_EXPECTED="normal:$(( SIZE_LOOPS_NORMAL * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
   SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},busy:$(( SIZE_LOOPS_BUSY * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
   SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},large:$(( SIZE_LOOPS_LARGE * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
   SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},xlarge:$(( SIZE_LOOPS_XLARGE * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"

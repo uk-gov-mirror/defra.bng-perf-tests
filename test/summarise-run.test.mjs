@@ -36,7 +36,7 @@ function buildResults() {
   }
 
   for (const [size, ms, n] of [
-    ['everyday', 400, 20],
+    ['normal', 400, 20],
     ['busy', 900, 8],
     ['large', 4200, 3],
     ['xlarge', 9000, 2]
@@ -49,7 +49,7 @@ function buildResults() {
   // Journey legs, three per iteration on one thread, so the end-to-end
   // reconstruction has triples to close.
   for (const [size, base, steps] of [
-    ['everyday', 900, [1, 2, 10]],
+    ['normal', 900, [1, 2, 10]],
     ['large', 5200, [1, 3]]
   ]) {
     for (const users of steps) {
@@ -69,12 +69,12 @@ function buildResults() {
   }
   for (const users of [1, 5]) {
     for (let i = 0; i < 4; i++) {
-      add(`post-intervention validate (everyday) @ ${users} user(s)`, 1500, '200', 'PI 1-1')
+      add(`post-intervention validate (normal) @ ${users} user(s)`, 1500, '200', 'PI 1-1')
     }
   }
   for (const users of [1, 5]) {
     for (let i = 0; i < 10; i++) {
-      add(`habitat edit distinct projects (everyday) @ ${users} user(s)`, 120, '200', 'Edit 1-1')
+      add(`habitat edit distinct projects (normal) @ ${users} user(s)`, 120, '200', 'Edit 1-1')
     }
   }
   // Contention: one in four conflicts at 2 users, half at 5.
@@ -90,7 +90,7 @@ function buildResults() {
     }
   }
   for (const [size, ms, n] of [
-    ['everyday', 90, 10],
+    ['normal', 90, 10],
     ['busy', 260, 6],
     ['large', 1400, 4],
     ['xlarge', 3600, 3]
@@ -125,7 +125,7 @@ before(() => {
       encoding: 'utf8',
       env: {
         ...process.env,
-        SIZE_RAMP_EXPECTED: 'everyday:20,busy:8,large:3,xlarge:2',
+        SIZE_RAMP_EXPECTED: 'normal:20,busy:8,large:3,xlarge:2',
         SIZE_RAMP_WINDOW_SECONDS: '160'
       }
     }
@@ -154,17 +154,17 @@ describe('every group reports', () => {
 
 describe('the journey ladder', () => {
   test('reconstructs an end-to-end time per step, not per leg', () => {
-    assert.match(output, /end to end \(everyday\) @ 1 user\(s\)/)
-    assert.match(output, /end to end \(everyday\) @ 10 user\(s\)/)
+    assert.match(output, /end to end \(normal\) @ 1 user\(s\)/)
+    assert.match(output, /end to end \(normal\) @ 10 user\(s\)/)
     assert.match(output, /end to end \(large\) @ 3 user\(s\)/)
   })
 
   test('keeps the sizes apart rather than averaging them together', () => {
     // A 4 MB upload and a 143 KB upload at the same concurrency are the two
     // questions the per-size ladder exists to separate.
-    const everyday = /end to end \(everyday\) @ 1 user\(s\)\s+(\d+)/.exec(output)
+    const normal = /end to end \(normal\) @ 1 user\(s\)\s+(\d+)/.exec(output)
     const large = /end to end \(large\) @ 1 user\(s\)\s+(\d+)/.exec(output)
-    assert.ok(everyday && large, 'both sizes should have their own row')
+    assert.ok(normal && large, 'both sizes should have their own row')
   })
 
   test('orders the ladder by size and then by concurrency', () => {
@@ -172,9 +172,9 @@ describe('the journey ladder', () => {
       (m) => `${m[1]}:${m[2]}`
     )
     assert.deepEqual(order, [
-      'everyday:1',
-      'everyday:2',
-      'everyday:10',
+      'normal:1',
+      'normal:2',
+      'normal:10',
       'large:1',
       'large:3'
     ])
@@ -203,14 +203,14 @@ describe('the probe timeline', () => {
     // It is a timeline, not a staircase: ordering it by size and concurrency
     // interleaves phases that ran either side of each other.
     const sizeRamp = output.indexOf('during size ramp')
-    const journey = output.indexOf('during upload journey (everyday) @ 1 user(s)')
+    const journey = output.indexOf('during upload journey (normal) @ 1 user(s)')
     const mixed = output.indexOf('during mixed workload')
     assert.ok(sizeRamp > 0 && journey > sizeRamp, 'size ramp ran before the journey')
     assert.ok(mixed > journey, 'the mixed workload ran last')
   })
 
   test('collapses a journey step to one row rather than one per leg', () => {
-    const rows = output.match(/during upload journey \(everyday\) @ 1 user\(s\)/g)
+    const rows = output.match(/during upload journey \(normal\) @ 1 user\(s\)/g)
     assert.equal(rows.length, 1)
   })
 })

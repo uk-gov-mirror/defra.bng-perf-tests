@@ -36,7 +36,7 @@ describe('window derivation', () => {
   test('a step gets less wall clock the more users it has', () => {
     const ladder = LADDERS.find((l) => l.key === 'journey')
     const at = (users) =>
-      windowSeconds({ ladder, size: 'everyday', users })
+      windowSeconds({ ladder, size: 'normal', users })
     assert.ok(
       at(1) > at(2),
       'one user has to wait out each iteration in turn, so it needs the longest window'
@@ -64,7 +64,7 @@ describe('window derivation', () => {
     const ladder = LADDERS.find((l) => l.key === 'journey')
     assert.ok(
       windowSeconds({ ladder, size: 'large', users: 2 }) >
-        windowSeconds({ ladder, size: 'everyday', users: 2 })
+        windowSeconds({ ladder, size: 'normal', users: 2 })
     )
   })
 })
@@ -91,9 +91,9 @@ describe('profiles', () => {
     assert.throws(() => profilePhases('nope'), /unknown profile "nope"/)
   })
 
-  test('the journey ladder is contiguous 1..10 at everyday in standard', () => {
+  test('the journey ladder is contiguous 1..10 at normal in standard', () => {
     const users = profilePhases('standard')
-      .filter((p) => p.key.startsWith('journey_everyday_'))
+      .filter((p) => p.key.startsWith('journey_normal_'))
       .map((p) => p.users)
     assert.deepEqual(users, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })

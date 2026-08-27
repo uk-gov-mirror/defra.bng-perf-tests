@@ -13,8 +13,8 @@ import { editableHabitats, parsePreparedSizes } from '../scripts/stage-uploads.m
 
 describe('parsePreparedSizes', () => {
   test('reads label:count pairs', () => {
-    assert.deepEqual(parsePreparedSizes('everyday:10,large:5'), [
-      { label: 'everyday', count: 10 },
+    assert.deepEqual(parsePreparedSizes('normal:10,large:5'), [
+      { label: 'normal', count: 10 },
       { label: 'large', count: 5 }
     ])
   })
@@ -27,19 +27,19 @@ describe('parsePreparedSizes', () => {
   })
 
   test('tolerates whitespace and trailing separators', () => {
-    assert.deepEqual(parsePreparedSizes(' everyday:2 , '), [
-      { label: 'everyday', count: 2 }
+    assert.deepEqual(parsePreparedSizes(' normal:2 , '), [
+      { label: 'normal', count: 2 }
     ])
   })
 
   test('rejects a bad entry loudly instead of dropping it', () => {
     // A silently dropped entry leaves a phase with no pool and no explanation
     // anywhere — the failure mode this whole file exists to avoid.
-    assert.throws(() => parsePreparedSizes('everyday'), /bad count/)
-    assert.throws(() => parsePreparedSizes('everyday:0'), /bad count/)
-    assert.throws(() => parsePreparedSizes('everyday:-1'), /bad count/)
-    assert.throws(() => parsePreparedSizes('everyday:2.5'), /bad count/)
-    assert.throws(() => parsePreparedSizes('Everyday:2'), /bad label/)
+    assert.throws(() => parsePreparedSizes('normal'), /bad count/)
+    assert.throws(() => parsePreparedSizes('normal:0'), /bad count/)
+    assert.throws(() => parsePreparedSizes('normal:-1'), /bad count/)
+    assert.throws(() => parsePreparedSizes('normal:2.5'), /bad count/)
+    assert.throws(() => parsePreparedSizes('Normal:2'), /bad label/)
     assert.throws(() => parsePreparedSizes('every day:2'), /bad label/)
   })
 })

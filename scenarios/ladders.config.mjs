@@ -34,7 +34,7 @@
  *
  *   window(N) = clamp(targetSamples * secondsPerIteration / N, minStep, maxStep)
  *
- * A 1-user everyday journey step gets ~24 s; the 10-user step needs ~2.4 s for
+ * A 1-user normal journey step gets ~24 s; the 10-user step needs ~2.4 s for
  * the same sample count and lands on the 10 s floor. A contiguous 1..10 ladder
  * costs ~3 minutes rather than the ~6 a flat 30 s window would have.
  *
@@ -49,7 +49,7 @@
  * rejects an UPLOAD_SIZES spec naming anything else — a label the plan does not
  * know stages a file nothing validates.
  */
-export const SIZE_LABELS = ['everyday', 'busy', 'large', 'xlarge']
+export const SIZE_LABELS = ['normal', 'busy', 'large', 'xlarge']
 
 /**
  * Shell-safe identifiers. Step properties become `-Jname=value` arguments and
@@ -65,7 +65,7 @@ export const LADDERS = [
      * that puts real bytes through the uploader on every iteration, so it is
      * the one that answers "what happens when N people upload N files at once".
      *
-     * Run per SIZE, not just at `everyday`: "10 people upload a 4 MB file at
+     * Run per SIZE, not just at `normal`: "10 people upload a 4 MB file at
      * once" is a different question from "10 people upload a 143 KB file at
      * once", and only the second one was ever asked before.
      */
@@ -74,7 +74,7 @@ export const LADDERS = [
     sizes: {
       // Contiguous 1..10: the point of a ladder is to find the knee, and
       // 1/2/5/10 cannot tell a cliff at 7 from a slope.
-      everyday: { steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], secondsPerIteration: 4 },
+      normal: { steps: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], secondsPerIteration: 4 },
       busy: { steps: [1, 2, 5, 10], secondsPerIteration: 6 },
       large: { steps: [1, 2, 3, 5, 8, 10], secondsPerIteration: 14 },
       xlarge: { steps: [1, 2, 5], secondsPerIteration: 30 }
@@ -119,7 +119,7 @@ export const LADDERS = [
     title: 'Post-intervention validate',
     perSize: true,
     sizes: {
-      everyday: { steps: [1, 2, 5, 10], secondsPerIteration: 5 },
+      normal: { steps: [1, 2, 5, 10], secondsPerIteration: 5 },
       large: { steps: [1, 2, 5], secondsPerIteration: 16 }
     },
     // Three, not more: this ladder answers "does post-intervention cost more
@@ -145,7 +145,7 @@ export const LADDERS = [
     title: 'Habitat edit (distinct projects)',
     perSize: true,
     sizes: {
-      everyday: { steps: [1, 2, 3, 5, 10], secondsPerIteration: 1 },
+      normal: { steps: [1, 2, 3, 5, 10], secondsPerIteration: 1 },
       large: { steps: [1, 2, 5], secondsPerIteration: 4 }
     },
     targetSamples: 12
@@ -225,19 +225,19 @@ export const PROFILES = {
     budgetMinutes: 20,
     ladders: {
       journey: {
-        everyday: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        normal: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         busy: [1, 5, 10],
         large: [1, 2, 3, 5, 10]
       },
       revalidate: { large: [1, 2, 5, 10, 20] },
-      pi: { everyday: [1, 2, 5, 10], large: [1, 5] },
-      edit: { everyday: [1, 2, 3, 5, 10], large: [1, 5] },
+      pi: { normal: [1, 2, 5, 10], large: [1, 5] },
+      edit: { normal: [1, 2, 3, 5, 10], large: [1, 5] },
       editContention: [2, 3, 5, 10]
     },
     fetchRamp: true,
     mixedSeconds: 120,
     targetScale: 1,
-    sizeRampLoops: { everyday: 20, busy: 8, large: 3, xlarge: 2 }
+    sizeRampLoops: { normal: 20, busy: 8, large: 3, xlarge: 2 }
   }
 }
 
@@ -255,8 +255,8 @@ export const FETCH_RAMP = {
   // on the curve. `xlarge` is a single probe: at ~8 s a fetch it would
   // otherwise be a third of this phase for a document two orders of magnitude
   // past anything in the real corpus.
-  loops: { everyday: 5, busy: 3, large: 2, xlarge: 1 },
-  secondsPerIteration: { everyday: 1, busy: 2, large: 4, xlarge: 8 }
+  loops: { normal: 5, busy: 3, large: 2, xlarge: 1 },
+  secondsPerIteration: { normal: 1, busy: 2, large: 4, xlarge: 8 }
 }
 
 /** Threads the mixed workload runs with. */
@@ -272,7 +272,7 @@ export const MIXED_THREADS = 8
  * the ramp is 160 s, and it sits in front of every ladder in the run.
  */
 export const SIZE_ALLOWANCE_SECONDS = {
-  everyday: 2,
+  normal: 2,
   busy: 4,
   large: 12,
   xlarge: 26
@@ -518,7 +518,7 @@ export function ladderSteps(ladder) {
 }
 
 /**
- * The property-name suffix identifying one step. `journey_everyday_3`,
+ * The property-name suffix identifying one step. `journey_normal_3`,
  * `editContention_5`. Used for both the thread count and the delay, so the
  * generated .jmx and entrypoint.sh cannot drift apart on naming.
  */

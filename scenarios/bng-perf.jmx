@@ -6,10 +6,10 @@
 is what the CDP portal serves (it renders a single dashboard from the root of the
 results prefix). Nothing needs selecting: an unset TEST_SCENARIO runs all of this.
 
-Two thread groups answer "is everyday use healthy?", and seven answer "what
+Two thread groups answer "is normal use healthy?", and seven answer "what
 happens when uploads get big or numerous?".
 
-EVERYDAY (runs first, on its own, so its numbers are uncontended)
+NORMAL (runs first, on its own, so its numbers are uncontended)
 
   1. "Home page" — GET / on the public FRONTEND (no auth). A smoke check that the
      home page loads and returns 200 within maxResponseMs.
@@ -31,14 +31,14 @@ EVERYDAY (runs first, on its own, so its numbers are uncontended)
 
 UPLOAD LOAD, which answers three questions a PM asks in this order:
 
-  3. What does an everyday upload cost?       -&gt; "Size ramp", `everyday` label
+  3. What does a normal upload cost?       -&gt; "Size ramp", `normal` label
   4. When does a BIG file become a problem?   -&gt; "Size ramp", the larger labels
 
-     The ramp is ONE user doing a fixed, WEIGHTED pass: 20 everyday, 8 busy, 3 large,
+     The ramp is ONE user doing a fixed, WEIGHTED pass: 20 normal, 8 busy, 3 large,
      2 xlarge (sizeLoops*). One user is the point — these numbers only mean
      "the cost of validating this file" if nothing else is hitting the service, which
      rules out giving each size its own thread. But an unweighted pass makes every size
-     share a sample count with the slowest one, so `everyday` — the number asked for
+     share a sample count with the slowest one, so `normal` — the number asked for
      first, and the only size real files actually reach — got as few samples as a 9 MB
      file did. The weights are roughly inverse to file size, so each size takes a
      comparable share of the window and the small ones earn a percentile rather than a
@@ -140,7 +140,7 @@ Runtime properties (all overridable with -J..., wired from env vars in entrypoin
                                    30s per step, scheduled after the concurrency ramp).
                                    Set a journeyUsers* to 0 to suppress that step.
   journeyFile                      the file each journey iteration uploads (default the
-                                   committed everyday fixture)
+                                   committed normal fixture)
   journeyBudgetMs                  latency budget for the validate+scan leg (default 20000)
   uploaderUrl                      the CDP Uploader base URL — the backend returns only
                                    the upload PATH, so the plan needs the host too
@@ -207,9 +207,9 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             <stringProp name="Argument.value">${__P(validateBudgetMs,30000)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
-          <elementProp name="everydayBudgetMs" elementType="Argument">
-            <stringProp name="Argument.name">everydayBudgetMs</stringProp>
-            <stringProp name="Argument.value">${__P(everydayBudgetMs,5000)}</stringProp>
+          <elementProp name="normalBudgetMs" elementType="Argument">
+            <stringProp name="Argument.name">normalBudgetMs</stringProp>
+            <stringProp name="Argument.value">${__P(normalBudgetMs,5000)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="createParcels" elementType="Argument">
@@ -242,9 +242,9 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             <stringProp name="Argument.value">${__P(uploaderUrl,http://localhost:7337)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
-          <elementProp name="journeyFile_everyday" elementType="Argument">
-            <stringProp name="Argument.name">journeyFile_everyday</stringProp>
-            <stringProp name="Argument.value">${__P(journeyFile_everyday,/opt/perftest/fixtures/baseline-everyday.gpkg)}</stringProp>
+          <elementProp name="journeyFile_normal" elementType="Argument">
+            <stringProp name="Argument.name">journeyFile_normal</stringProp>
+            <stringProp name="Argument.value">${__P(journeyFile_normal,/opt/perftest/fixtures/baseline-normal.gpkg)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="journeyFile_busy" elementType="Argument">
@@ -683,13 +683,13 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="everyday x N">
-          <stringProp name="LoopController.loops">${__P(sizeLoopsEveryday,20)}</stringProp>
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="normal x N">
+          <stringProp name="LoopController.loops">${__P(sizeLoopsNormal,20)}</stringProp>
           <boolProp name="LoopController.continue_forever">true</boolProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs file size: everyday (1 user)">
-            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_everyday,)}</stringProp>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="validation cost vs file size: normal (1 user)">
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_normal,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -726,7 +726,7 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
             </ResponseAssertion>
             <hashTree/>
             <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Within budget">
-              <stringProp name="DurationAssertion.duration">${everydayBudgetMs}</stringProp>
+              <stringProp name="DurationAssertion.duration">${normalBudgetMs}</stringProp>
             </DurationAssertion>
             <hashTree/>
           </hashTree>
@@ -878,8 +878,8 @@ vars and the delays move with it; override a delay and you own the arithmetic.</
       </hashTree>
       <!-- BEGIN GENERATED: ladders — scripts/gen-scenario.mjs, do not edit by hand -->
       <!-- Upload journey: 23 step(s) -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 1 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 1 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 1 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 1 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -887,11 +887,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_1,1)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_1,20)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_1,220)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_1,20)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_1,220)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -934,7 +934,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 1 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 1 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -985,7 +985,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 1 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 1 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1001,8 +1001,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -1020,7 +1020,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 1 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 1 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1073,8 +1073,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 2 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 2 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 2 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 2 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -1082,11 +1082,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_2,2)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_2,10)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_2,244)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_2,10)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_2,244)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1129,7 +1129,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 2 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 2 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1180,7 +1180,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 2 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 2 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1196,8 +1196,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -1215,7 +1215,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 2 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 2 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1268,8 +1268,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 3 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 3 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 3 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 3 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -1277,11 +1277,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_3,3)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_3,3)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_3,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_3,258)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_3,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_3,258)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1324,7 +1324,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 3 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 3 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1375,7 +1375,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 3 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 3 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1391,8 +1391,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -1410,7 +1410,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 3 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 3 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1463,8 +1463,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 4 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 4 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 4 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 4 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -1472,11 +1472,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_4,4)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_4,4)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_4,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_4,270)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_4,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_4,270)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1519,7 +1519,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 4 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 4 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1570,7 +1570,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 4 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 4 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1586,8 +1586,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -1605,7 +1605,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 4 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 4 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1658,8 +1658,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 5 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 5 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 5 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 5 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -1667,11 +1667,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_5,5)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_5,282)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_5,282)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1714,7 +1714,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 5 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 5 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1765,7 +1765,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 5 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 5 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1781,8 +1781,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -1800,7 +1800,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 5 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 5 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1853,8 +1853,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 6 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 6 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 6 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 6 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -1862,11 +1862,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_6,6)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_6,6)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_6,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_6,294)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_6,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_6,294)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -1909,7 +1909,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 6 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 6 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -1960,7 +1960,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 6 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 6 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -1976,8 +1976,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -1995,7 +1995,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 6 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 6 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2048,8 +2048,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 7 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 7 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 7 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 7 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -2057,11 +2057,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_7,7)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_7,7)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_7,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_7,306)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_7,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_7,306)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2104,7 +2104,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 7 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 7 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2155,7 +2155,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 7 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 7 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -2171,8 +2171,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -2190,7 +2190,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 7 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 7 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2243,8 +2243,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 8 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 8 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 8 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 8 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -2252,11 +2252,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_8,8)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_8,8)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_8,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_8,318)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_8,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_8,318)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2299,7 +2299,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 8 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 8 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2350,7 +2350,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 8 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 8 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -2366,8 +2366,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -2385,7 +2385,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 8 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 8 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2438,8 +2438,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 9 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 9 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 9 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 9 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -2447,11 +2447,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_9,9)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_9,9)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_9,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_9,330)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_9,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_9,330)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2494,7 +2494,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 9 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 9 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2545,7 +2545,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 9 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 9 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -2561,8 +2561,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -2580,7 +2580,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 9 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 9 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2633,8 +2633,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
           </hashTree>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey everyday @ 10 user(s)">
-        <stringProp name="TestPlan.comments">The FULL upload journey at 10 concurrent user(s), everyday file —
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Upload journey normal @ 10 user(s)">
+        <stringProp name="TestPlan.comments">The FULL upload journey at 10 concurrent user(s), normal file —
 initiate, multipart POST to the CDP Uploader, then validate, as one closed
 loop per user. Every iteration is a real new upload, so the uploader and
 its scanner are inside the number.
@@ -2642,11 +2642,11 @@ its scanner are inside the number.
 No client-side poll: the backend&apos;s validate route waits for the scan
 itself, so the validate leg carries the same wall clock a frontend user
 experiences, without a polling loop&apos;s noise in the report.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_everyday_10,10)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_journey_normal_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_journey_everyday_10,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_journey_everyday_10,342)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_journey_normal_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_journey_normal_10,342)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -2689,7 +2689,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 10 user(s): initiate">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 10 user(s): initiate">
           <stringProp name="HTTPSampler.path">/upload/initiate</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -2740,7 +2740,7 @@ experiences, without a polling loop&apos;s noise in the report.</stringProp>
           <boolProp name="IfController.useExpression">true</boolProp>
         </IfController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 10 user(s): send file to uploader">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 10 user(s): send file to uploader">
             <stringProp name="TestPlan.comments">The backend returns the uploader PATH only, so the full URL is assembled from
 uploaderUrl. A successful upload answers 302 to the redirect target; the
 redirect is NOT followed — it points at the frontend flow, not the API.</stringProp>
@@ -2756,8 +2756,8 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </elementProp>
             <elementProp name="HTTPsampler.Files" elementType="HTTPFileArgs">
               <collectionProp name="HTTPFileArgs.files">
-                <elementProp name="${journeyFile_everyday}" elementType="HTTPFileArg">
-                  <stringProp name="File.path">${journeyFile_everyday}</stringProp>
+                <elementProp name="${journeyFile_normal}" elementType="HTTPFileArg">
+                  <stringProp name="File.path">${journeyFile_normal}</stringProp>
                   <stringProp name="File.paramname">file</stringProp>
                   <stringProp name="File.mimetype">application/geopackage+sqlite3</stringProp>
                 </elementProp>
@@ -2775,7 +2775,7 @@ redirect is NOT followed — it points at the frontend flow, not the API.</strin
             </ResponseAssertion>
             <hashTree/>
           </hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (everyday) @ 10 user(s): validate incl virus scan">
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="journey (normal) @ 10 user(s): validate incl virus scan">
             <stringProp name="HTTPSampler.path">/baseline/validate/${journeyUploadId}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -6476,17 +6476,17 @@ other in the report so the difference between them is the uploader.</stringProp>
         </hashTree>
       </hashTree>
       <!-- Post-intervention validate: 7 step(s) -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate everyday @ 1 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate normal @ 1 user(s)">
         <stringProp name="TestPlan.comments">1 thread(s) validating ONE staged post-intervention upload into
-1 prepared project(s) — each already holding the everyday baseline the
+1 prepared project(s) — each already holding the normal baseline the
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_1,1)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_normal_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_1,15)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_1,659)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_normal_1,15)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_normal_1,659)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6522,7 +6522,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -6533,8 +6533,8 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (everyday) @ 1 user(s)">
-          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_everyday,)}</stringProp>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (normal) @ 1 user(s)">
+          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_normal,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -6576,17 +6576,17 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate everyday @ 2 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate normal @ 2 user(s)">
         <stringProp name="TestPlan.comments">2 thread(s) validating ONE staged post-intervention upload into
-2 prepared project(s) — each already holding the everyday baseline the
+2 prepared project(s) — each already holding the normal baseline the
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_2,2)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_normal_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_2,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_2,679)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_normal_2,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_normal_2,679)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6622,7 +6622,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -6633,8 +6633,8 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (everyday) @ 2 user(s)">
-          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_everyday,)}</stringProp>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (normal) @ 2 user(s)">
+          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_normal,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -6676,17 +6676,17 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate everyday @ 5 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate normal @ 5 user(s)">
         <stringProp name="TestPlan.comments">5 thread(s) validating ONE staged post-intervention upload into
-5 prepared project(s) — each already holding the everyday baseline the
+5 prepared project(s) — each already holding the normal baseline the
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_5,5)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_normal_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_5,692)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_normal_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_normal_5,692)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6722,7 +6722,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -6733,8 +6733,8 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (everyday) @ 5 user(s)">
-          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_everyday,)}</stringProp>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (normal) @ 5 user(s)">
+          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_normal,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -6776,17 +6776,17 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate everyday @ 10 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Post-intervention validate normal @ 10 user(s)">
         <stringProp name="TestPlan.comments">10 thread(s) validating ONE staged post-intervention upload into
-10 prepared project(s) — each already holding the everyday baseline the
+10 prepared project(s) — each already holding the normal baseline the
 upload pairs with. This is the peer of /baseline/validate that no sampler
 in the plan had ever touched, and plausibly the heavier of the two: it
 reconciles against the stored baseline rather than starting from nothing.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_everyday_10,10)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_pi_normal_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_pi_everyday_10,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_pi_everyday_10,705)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_pi_normal_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_pi_normal_10,705)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -6822,7 +6822,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -6833,8 +6833,8 @@ reconciles against the stored baseline rather than starting from nothing.</strin
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (everyday) @ 10 user(s)">
-          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_everyday,)}</stringProp>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="post-intervention validate (normal) @ 10 user(s)">
+          <stringProp name="HTTPSampler.path">/post-intervention/validate/${__P(piUploadId_normal,)}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -7177,7 +7177,7 @@ reconciles against the stored baseline rather than starting from nothing.</strin
         </hashTree>
       </hashTree>
       <!-- Habitat edit (distinct projects): 8 step(s) -->
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit everyday @ 1 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit normal @ 1 user(s)">
         <stringProp name="TestPlan.comments">1 thread(s) each editing a habitat in a DIFFERENT project, so this
 measures throughput rather than lock contention.
 
@@ -7186,11 +7186,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_1,1)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_normal_1,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_1,12)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_1,768)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_normal_1,12)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_normal_1,768)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7226,7 +7226,7 @@ nothing around it is.</stringProp>
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -7237,7 +7237,7 @@ nothing around it is.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (everyday) @ 1 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (normal) @ 1 user(s)">
           <stringProp name="HTTPSampler.path">/projects/${preparedProjectId}/habitats/${preparedFeatureId}</stringProp>
           <stringProp name="HTTPSampler.method">PUT</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -7271,7 +7271,7 @@ nothing around it is.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit everyday @ 2 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit normal @ 2 user(s)">
         <stringProp name="TestPlan.comments">2 thread(s) each editing a habitat in a DIFFERENT project, so this
 measures throughput rather than lock contention.
 
@@ -7280,11 +7280,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_2,2)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_normal_2,2)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_2,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_2,781)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_normal_2,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_normal_2,781)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7320,7 +7320,7 @@ nothing around it is.</stringProp>
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -7331,7 +7331,7 @@ nothing around it is.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (everyday) @ 2 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (normal) @ 2 user(s)">
           <stringProp name="HTTPSampler.path">/projects/${preparedProjectId}/habitats/${preparedFeatureId}</stringProp>
           <stringProp name="HTTPSampler.method">PUT</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -7365,7 +7365,7 @@ nothing around it is.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit everyday @ 3 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit normal @ 3 user(s)">
         <stringProp name="TestPlan.comments">3 thread(s) each editing a habitat in a DIFFERENT project, so this
 measures throughput rather than lock contention.
 
@@ -7374,11 +7374,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_3,3)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_normal_3,3)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_3,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_3,790)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_normal_3,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_normal_3,790)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7414,7 +7414,7 @@ nothing around it is.</stringProp>
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -7425,7 +7425,7 @@ nothing around it is.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (everyday) @ 3 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (normal) @ 3 user(s)">
           <stringProp name="HTTPSampler.path">/projects/${preparedProjectId}/habitats/${preparedFeatureId}</stringProp>
           <stringProp name="HTTPSampler.method">PUT</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -7459,7 +7459,7 @@ nothing around it is.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit everyday @ 5 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit normal @ 5 user(s)">
         <stringProp name="TestPlan.comments">5 thread(s) each editing a habitat in a DIFFERENT project, so this
 measures throughput rather than lock contention.
 
@@ -7468,11 +7468,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_5,5)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_normal_5,5)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_5,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_5,799)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_normal_5,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_normal_5,799)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7508,7 +7508,7 @@ nothing around it is.</stringProp>
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -7519,7 +7519,7 @@ nothing around it is.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (everyday) @ 5 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (normal) @ 5 user(s)">
           <stringProp name="HTTPSampler.path">/projects/${preparedProjectId}/habitats/${preparedFeatureId}</stringProp>
           <stringProp name="HTTPSampler.method">PUT</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -7553,7 +7553,7 @@ nothing around it is.</stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit everyday @ 10 user(s)">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Habitat edit normal @ 10 user(s)">
         <stringProp name="TestPlan.comments">10 thread(s) each editing a habitat in a DIFFERENT project, so this
 measures throughput rather than lock contention.
 
@@ -7562,11 +7562,11 @@ SELECTed FOR UPDATE and pulled into Node, the unit totals are recalculated
 across it, and the write_projects_audit_log trigger stores both the new
 and the previous document. The write itself is a surgical jsonb_set;
 nothing around it is.</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_everyday_10,10)}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(users_edit_normal_10,10)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <boolProp name="ThreadGroup.scheduler">true</boolProp>
-        <stringProp name="ThreadGroup.duration">${__P(window_edit_everyday_10,8)}</stringProp>
-        <stringProp name="ThreadGroup.delay">${__P(delay_edit_everyday_10,808)}</stringProp>
+        <stringProp name="ThreadGroup.duration">${__P(window_edit_normal_10,8)}</stringProp>
+        <stringProp name="ThreadGroup.delay">${__P(delay_edit_normal_10,808)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
@@ -7602,7 +7602,7 @@ nothing around it is.</stringProp>
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -7613,7 +7613,7 @@ nothing around it is.</stringProp>
           <stringProp name="fileEncoding"></stringProp>
         </CSVDataSet>
         <hashTree/>
-        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (everyday) @ 10 user(s)">
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="habitat edit distinct projects (normal) @ 10 user(s)">
           <stringProp name="HTTPSampler.path">/projects/${preparedProjectId}/habitats/${preparedFeatureId}</stringProp>
           <stringProp name="HTTPSampler.method">PUT</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
@@ -8337,13 +8337,13 @@ loops rather than GETting /projects/ with an empty path segment.</stringProp>
           </collectionProp>
         </HeaderManager>
         <hashTree/>
-        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="everyday x N">
+        <LoopController guiclass="LoopControlPanel" testclass="LoopController" testname="normal x N">
           <boolProp name="LoopController.continue_forever">false</boolProp>
-          <stringProp name="LoopController.loops">${__P(fetchLoops_everyday,5)}</stringProp>
+          <stringProp name="LoopController.loops">${__P(fetchLoops_normal,5)}</stringProp>
         </LoopController>
         <hashTree>
-          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="fetch everyday project (GET /projects/{id})">
-            <stringProp name="HTTPSampler.path">/projects/${__P(sizedProjectId_everyday,)}</stringProp>
+          <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="fetch normal project (GET /projects/{id})">
+            <stringProp name="HTTPSampler.path">/projects/${__P(sizedProjectId_normal,)}</stringProp>
             <stringProp name="HTTPSampler.method">GET</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
@@ -8526,7 +8526,7 @@ that, every revalidate would 404 the edits behind it.</stringProp>
         </HeaderManager>
         <hashTree/>
         <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Prepared project pool">
-          <stringProp name="filename">${__P(preparedCsv_everyday,/opt/perftest/stage/prepared-everyday.csv)}</stringProp>
+          <stringProp name="filename">${__P(preparedCsv_normal,/opt/perftest/stage/prepared-normal.csv)}</stringProp>
           <stringProp name="variableNames">preparedProjectId,preparedFeatureId,preparedBroadType,preparedHabitatType,preparedCondition</stringProp>
           <stringProp name="delimiter">,</stringProp>
           <boolProp name="quotedData">true</boolProp>
@@ -8642,7 +8642,7 @@ that, every revalidate would 404 the edits behind it.</stringProp>
         </ThroughputController>
         <hashTree>
           <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="mixed: revalidate an upload (POST /baseline/validate/{uploadId})">
-            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_everyday,)}</stringProp>
+            <stringProp name="HTTPSampler.path">/baseline/validate/${__P(uploadId_normal,)}</stringProp>
             <stringProp name="HTTPSampler.method">POST</stringProp>
             <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
             <boolProp name="HTTPSampler.use_keepalive">true</boolProp>

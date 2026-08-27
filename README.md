@@ -75,7 +75,7 @@ There is exactly **one profile**: `standard`. There used to be five (`quick` /
 `standard` / `deep` / `full` / `soak`); keeping five step lists meaningful cost more
 than the flexibility bought, so the suite now runs one well-chosen set — the old
 `deep`. The plan contains **53 ladder steps** and `standard` runs 40 of them: the
-contiguous 1..10 everyday journey ladder, both file sizes on every other ladder, the
+contiguous 1..10 normal journey ladder, both file sizes on every other ladder, the
 full contention ladder, and a two-minute mixed workload — **~18 min of plan against a
 20-minute budget**. (The steps it skips — the `busy` intermediate journeys and the
 `xlarge` journey/revalidate extremes — exist in the plan at 0 threads.)
@@ -123,13 +123,13 @@ seconds                     0             215      350  415     546     659    7
 home+list                   |=|
 probe                         |===================================================================|
 size ramp                       |=========|
-journey everyday 1..10                     |=======|
+journey normal 1..10                     |=======|
 journey busy 1,5,10                                 |==|
 journey large 1..10                                     |=======|
 revalidate large 1..20                                          |=======|
-post-intervention everyday                                              |===|
+post-intervention normal                                              |===|
 post-intervention large 1,5                                                 |==|
-habitat edit everyday 1..10                                                    |==|
+habitat edit normal 1..10                                                    |==|
 habitat edit large 1,5                                                            |==|
 edit contention 2..10                                                                 |=|
 fetch ramp                                                                              |=|
@@ -154,7 +154,7 @@ produce**:
 window(N) = clamp(targetSamples × secondsPerIteration ÷ N, 10s, 45s)
 ```
 
-A 1-user everyday journey step gets 24 s; the 10-user step needs ~2.4 s for the same
+A 1-user normal journey step gets 24 s; the 10-user step needs ~2.4 s for the same
 sample count and lands on the 10 s floor. That is what makes a contiguous 1..10 ladder
 cost ~3 minutes rather than the ~6 a flat window would have.
 
@@ -299,7 +299,7 @@ They are built to answer these questions, in roughly the order a PM asks them:
 
 | Question                                                       | Where the answer is                                   |
 | -------------------------------------------------------------- | ----------------------------------------------------- |
-| What does an everyday upload cost?                             | `validation cost vs file size: everyday (1 user)`     |
+| What does a normal upload cost?                             | `validation cost vs file size: normal (1 user)`     |
 | At what file size does it become a problem?                    | the rest of the size ramp                             |
 | **What happens when N people upload N files at once?**         | `end to end (<size>) @ N user(s)`                     |
 | Where does that journey time go?                               | the `journey (<size>) @ N user(s): <leg>` rows        |
@@ -347,10 +347,10 @@ of the report sees.
 
 #### The journey ladder runs per file size
 
-`journey (everyday) @ 10 user(s)` and `journey (large) @ 10 user(s)` are different
+`journey (normal) @ 10 user(s)` and `journey (large) @ 10 user(s)` are different
 questions: 143 KB and 4 MB through the uploader are not the same load, and the second
 one is the one nobody had ever run. The summary keeps them apart rather than averaging
-them, and the ladder is **contiguous** at `everyday` — 1, 2, 3, …, 10 — because the
+them, and the ladder is **contiguous** at `normal` — 1, 2, 3, …, 10 — because the
 point of a ladder is to find the knee, and 1/2/5/10 cannot tell a cliff at 7 from a
 slope.
 
@@ -394,7 +394,7 @@ The latency columns cover the **accepted** requests only — mixing in the ones 
 
 > **These ladders write, permanently.** Every edit lands an audit row holding two full
 > copies of the document, in an append-only table that cannot be cleared down. That is
-> why the edit ladders default to `everyday` and the larger sizes are opt-in — see
+> why the edit ladders default to `normal` and the larger sizes are opt-in — see
 > [These groups grow the database permanently](#these-groups-grow-the-database-permanently),
 > which applies here too.
 
@@ -422,25 +422,25 @@ pool exhaustion to show up, none of which a 30-second phase can see.
 
 #### The size ramp is one user, and weighted
 
-The ramp runs a single user through a **fixed, weighted pass** — 20 `everyday`,
+The ramp runs a single user through a **fixed, weighted pass** — 20 `normal`,
 8 `busy`, 3 `large`, 2 `xlarge` — rather than looping all four evenly until the
 clock runs out.
 
-One user is deliberate: `validation cost vs file size: everyday (1 user)` only means "what an
-everyday upload costs" if nothing else is hitting the service while it is
+One user is deliberate: `validation cost vs file size: normal (1 user)` only means "what an
+normal upload costs" if nothing else is hitting the service while it is
 measured, which is why each size does **not** get its own thread. But an even
 pass has a flaw — every size shares a sample count with the slowest one, because
-one loop cannot finish until the 9.3 MB file has. `everyday` is the number a PM
+one loop cannot finish until the 9.3 MB file has. `normal` is the number a PM
 asks for first and the only size real files actually reach (the reference corpus
 tops out at ~80 parcels), and it was getting as few samples as `xlarge` did.
 
 The weights are roughly inverse to file size, so each size takes a comparable
 share of the window and the small ones earn a percentile instead of a single
 point. Because the pass is loop-count driven, those counts are **exact** rather
-than "whatever fitted" — a run either produces 20 `everyday` samples or the
+than "whatever fitted" — a run either produces 20 `normal` samples or the
 `SIZE_RAMP_DURATION_SECONDS` guard tripped.
 
-Set the weights with `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}`, or run the whole
+Set the weights with `SIZE_LOOPS_{NORMAL,BUSY,LARGE,XLARGE}`, or run the whole
 pass more than once with `SIZE_RAMP_LOOPS`.
 
 ##### The window is derived from the weights, and a short pass says so
@@ -459,7 +459,7 @@ allowance, and the window is what the weighted pass adds up to.
 
 | Allowance                          | Default | Per validate of |
 | ---------------------------------- | ------- | --------------- |
-| `SIZE_ALLOWANCE_EVERYDAY_SECONDS`  | `2`     | 80 parcels      |
+| `SIZE_ALLOWANCE_NORMAL_SECONDS`  | `2`     | 80 parcels      |
 | `SIZE_ALLOWANCE_BUSY_SECONDS`      | `4`     | 800 parcels     |
 | `SIZE_ALLOWANCE_LARGE_SECONDS`     | `12`    | 5 000 parcels   |
 | `SIZE_ALLOWANCE_XLARGE_SECONDS`    | `26`    | 12 000 parcels  |
@@ -478,7 +478,7 @@ dead air, which is why every run reports what it actually used:
 ```
 Did the size ramp complete its pass?
   size      expected  got
-  everyday  20        20
+  normal  20        20
   busy      8         8
   large     3         1  ← CUT OFF
   xlarge    2         0  ← CUT OFF
@@ -531,12 +531,12 @@ simply generated at run time as before. This is why `bng-library` and its
 or the npm registry.
 
 For scale: real BNG files in the reference corpus top out around **80 parcels /
-124 KB**, which is what `everyday` reproduces. The larger steps exist to find
+124 KB**, which is what `normal` reproduces. The larger steps exist to find
 where the service stops coping, not because anyone submits them today.
 
 | Label      | Parcels | File size | Generation |
 | ---------- | ------- | --------- | ---------- |
-| `everyday` | 80      | 140 KB    | 0.02 s     |
+| `normal` | 80      | 140 KB    | 0.02 s     |
 | `busy`     | 800     | 704 KB    | 0.08 s     |
 | `large`    | 5 000   | 4.0 MB    | 1.6 s      |
 | `xlarge`   | 12 000  | 9.3 MB    | 9.0 s      |
@@ -626,7 +626,7 @@ prerequisite:
 | habitat edit | `prepared-<size>.csv` |
 | edit contention | `contentionProjectId` |
 | fetch ramp | `sizedProjectId_<size>` |
-| mixed workload | `prepared-everyday.csv` **and** `uploadId_everyday` |
+| mixed workload | `prepared-normal.csv` **and** `uploadId_normal` |
 
 A missing prerequisite zeroes that phase's threads, and because the schedule is
 **re-derived after staging**, the phase hands its window back rather than leaving dead
@@ -639,7 +639,7 @@ either: a failure to build the project pool, and a failure to stage *any* size a
 
 ##### The size labels are fixed; the sizes are not
 
-`scenarios/bng-perf.jmx` reads `uploadId_everyday`, `uploadId_busy`,
+`scenarios/bng-perf.jmx` reads `uploadId_normal`, `uploadId_busy`,
 `uploadId_large` and `uploadId_xlarge` by name — the generator writes one
 sampler per size from `SIZE_LABELS` in `scenarios/ladders.config.mjs`. So
 `UPLOAD_SIZES` sets **how big each step is**, which is the point of it, but not
@@ -653,7 +653,7 @@ anything but bad numbers, so `stage-uploads.mjs` rejects both up front:
 
 ```
 stage-uploads failed: UPLOAD_SIZES must name exactly the labels
-scenarios/bng-perf.jmx reads (everyday, busy, large, xlarge) — not in the plan:
+scenarios/bng-perf.jmx reads (normal, busy, large, xlarge) — not in the plan:
 huge. Change the parcel counts, not the labels.
 ```
 
@@ -699,7 +699,7 @@ run is meaningless.
 | Env var                          | Default                                        | Purpose                                                        |
 | -------------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
 | `TEST_SCENARIO`                  | `bng-perf`                                     | Escape hatch only — leave unset to run the whole suite.         |
-| `UPLOAD_SIZES`                   | `everyday:80,busy:800,large:5000,xlarge:12000` | How big each step is. `label:parcels` pairs — the **labels are fixed**, see below. |
+| `UPLOAD_SIZES`                   | `normal:80,busy:800,large:5000,xlarge:12000` | How big each step is. `label:parcels` pairs — the **labels are fixed**, see below. |
 | `STAGE_UPLOADS`                  | `true` for this plan                           | `false` skips staging *and* every phase that needed it.         |
 | `CDP_UPLOADER_URL`               | `https://cdp-uploader.<ENVIRONMENT>.cdp-int.defra.cloud` | The uploader to POST staged files to.                 |
 | `PROJECT_POOL_SIZE`              | `40`                                           | Projects to spread concurrent writes across. Keep ≥ max threads. |
@@ -710,24 +710,24 @@ run is meaningless.
 | `PROBE_DURATION_SECONDS`         | _derived_                                      | How long the background probe runs. Derived to span every phase; override and you own it. |
 | `PROBE_THINK_MS` / `PROBE_MAX_LATENCY_MS` | `2000` / `2000`                       | Probe pacing, and the latency it is judged against.             |
 | `VALIDATE_BUDGET_MS`             | `30000`                                        | Latency budget for a validate call under load.                  |
-| `EVERYDAY_BUDGET_MS`             | `5000`                                         | Tighter budget for the everyday-sized file.                     |
+| `NORMAL_BUDGET_MS`             | `5000`                                         | Tighter budget for the normal-sized file.                     |
 | `VALIDATE_RESPONSE_TIMEOUT_MS`   | `120000`                                       | Socket timeout — above this a sample is an error, not a slow success. |
 | `SIZE_RAMP_DURATION_SECONDS`     | _derived_ (`160`)                              | Window reserved for the size-ramp pass. Derived from the weights and the allowances below; override and you own it. |
-| `SIZE_ALLOWANCE_{EVERYDAY,BUSY,LARGE,XLARGE}_SECONDS` | `2/4/12/26`               | Time allowed per validate of each size. This is what the window is derived from. |
+| `SIZE_ALLOWANCE_{NORMAL,BUSY,LARGE,XLARGE}_SECONDS` | `2/4/12/26`               | Time allowed per validate of each size. This is what the window is derived from. |
 | `SIZE_RAMP_THREADS`              | `1`                                            | Users on the size ramp. `0` suppresses the phase — see below.    |
 | `SIZE_RAMP_LOOPS`                | `1`                                            | Weighted passes over the four sizes.                            |
-| `SIZE_LOOPS_{EVERYDAY,BUSY,LARGE,XLARGE}` | `20/8/3/2`                            | Samples per size in a pass. Weighted so small files earn a percentile. |
+| `SIZE_LOOPS_{NORMAL,BUSY,LARGE,XLARGE}` | `20/8/3/2`                            | Samples per size in a pass. Weighted so small files earn a percentile. |
 | `SIZE_RAMP_DELAY_SECONDS`        | _derived_                                      | When the size ramp starts.                                      |
 | `PERF_PROFILE`                   | `standard`                                     | The only profile. See [The profile](#the-profile--how-long-a-run-takes). |
 | `PERF_DUMP_SCHEDULE`             | unset                                          | `true` prints the resolved schedule and exits, touching nothing. |
-| `WINDOW_<step>`                  | _derived_                                      | Override one step's window, e.g. `WINDOW_journey_everyday_10=30`. The timeline re-derives around it. |
+| `WINDOW_<step>`                  | _derived_                                      | Override one step's window, e.g. `WINDOW_journey_normal_10=30`. The timeline re-derives around it. |
 | `PHASE_GAP_SECONDS`              | _derived per phase_                            | Set it and every phase gets that uniform gap instead of its own drain time. |
 | `MIX_THREADS`                    | `8`                                            | Threads on the mixed workload.                                  |
 | `MIX_{LIST,FETCH,EDIT,VALIDATE}_PERCENT` | `40/25/25/10`                          | The mix, as percent of iterations. Warns if they do not total 100. |
 | `MIX_THINK_MS`                   | `500`                                          | Pacing between mixed-workload iterations.                       |
-| `JOURNEY_FILE_{EVERYDAY,BUSY,LARGE,XLARGE}` | the committed fixture               | The file that size's journey ladder uploads.                    |
+| `JOURNEY_FILE_{NORMAL,BUSY,LARGE,XLARGE}` | the committed fixture               | The file that size's journey ladder uploads.                    |
 | `JOURNEY_BUDGET_MS`              | `35000`                                        | Budget for the journey's validate leg. **Above** the backend's own 30 s scan wait — see below. |
-| `JOURNEY_LARGE_BUDGET_MS`        | `60000`                                        | The same, for the non-`everyday` sizes.                         |
+| `JOURNEY_LARGE_BUDGET_MS`        | `60000`                                        | The same, for the non-`normal` sizes.                         |
 | `EDIT_BUDGET_MS`                 | `3000`                                         | Latency budget for one habitat edit.                            |
 | `FETCH_BUDGET_MS`                | `5000`                                         | Latency budget for `GET /projects/{id}`.                        |
 | `CONTENTION_FEATURES`            | `20`                                           | How many features of one project the contention ladder picks from. |
@@ -768,7 +768,7 @@ LocalStack service can go with it.
 > derivation, and from there the arithmetic is yours.
 
 **Want more samples rather than a faster answer?** `WINDOW_<step>` lengthens one
-step — `WINDOW_journey_everyday_10=30` triples the samples behind that percentile. The
+step — `WINDOW_journey_normal_10=30` triples the samples behind that percentile. The
 timeline re-derives around it and every later phase, plus the probe, moves to match.
 
 There is no separate "deep" plan to remember: the profile picks *which* steps, a

@@ -30,7 +30,7 @@ const FIXTURES_DIR = join(import.meta.dirname, '..', 'fixtures')
  * committed fast path for the mismatched size).
  */
 const SIZES = [
-  { label: 'everyday', parcels: 80 },
+  { label: 'normal', parcels: 80 },
   { label: 'busy', parcels: 800 },
   { label: 'large', parcels: 5000 },
   { label: 'xlarge', parcels: 12000 }
