@@ -30,6 +30,10 @@ RUN apk add --no-cache --virtual .build-deps npm git \
     && npm ci --ignore-scripts --no-audit --no-fund \
     && apk del .build-deps
 
+# scenarios/ carries three things the run needs: the plan itself, the generated
+# ladders.sh entrypoint.sh sources for its phase schedule, and the
+# ladders.config.mjs both are generated from (kept alongside so the image can be
+# inspected against its own source).
 COPY scenarios/ ./scenarios/
 COPY scripts/ ./scripts/
 COPY fixtures/ ./fixtures/

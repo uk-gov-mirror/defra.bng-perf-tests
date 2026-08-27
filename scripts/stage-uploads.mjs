@@ -26,7 +26,7 @@
 import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-import { makeGeoPackage } from './make-gpkg.mjs'
+import { makeGeoPackage, makeGeoPackagePair } from './make-gpkg.mjs'
 
 const API_BASE_URL = process.env.API_BASE_URL
 const BEARER_TOKEN = process.env.BEARER_TOKEN
@@ -49,13 +49,41 @@ const UPLOAD_READY_TIMEOUT_MS = Number(
 const UPLOAD_POLL_INTERVAL_MS = 1000
 const PROJECT_POOL_SIZE = Number(process.env.PROJECT_POOL_SIZE || 40)
 
+/**
+ * Which sizes need a PREPARED pool, and how big, as `label:count` pairs.
+ *
+ * A prepared project is one that already holds a validated baseline — which the
+ * edit, post-intervention and fetch groups all need and the plain pool cannot
+ * give them: an empty project has no feature to edit, no document worth
+ * fetching, and no baseline for a post-intervention upload to reconcile against.
+ *
+ * entrypoint.sh computes this from the ACTIVE PROFILE's own thread counts, so a
+ * run prepares exactly the pools it is going to use. Preparing a `large` pool
+ * costs a validate of a 4 MB file per project, which is real setup time to
+ * spend on a ladder the profile is not running.
+ */
+const PREPARED_SIZES = process.env.PREPARED_SIZES || ''
+
+/** Sizes needing a staged post-intervention upload, as a comma-separated list. */
+const PI_SIZES = process.env.PI_SIZES || ''
+
+/**
+ * How many features of ONE project the contention ladder gets to choose from.
+ *
+ * Each thread edits a different feature of the same project, which is the real
+ * scenario the project-row lock serialises — two people editing two habitats in
+ * one project. Fewer features than threads is fine (the CSV recycles); the pool
+ * only has to be wide enough that threads are not all queueing on one row.
+ */
+const CONTENTION_FEATURES = Number(process.env.CONTENTION_FEATURES || 20)
+
 const HTTP_BAD_REQUEST = 400
 
 /**
  * The file sizes the run profiles, as `label:parcels` pairs.
  *
  * The defaults bracket reality deliberately. Real BNG files in the reference
- * corpus top out around 80 parcels / 124 KB, so `everyday` is what a user
+ * corpus top out around 80 parcels / 124 KB, so `normal` is what a user
  * actually submits; the larger steps are there to find where the service stops
  * coping, not because anyone uploads them today.
  *
@@ -66,12 +94,12 @@ const HTTP_BAD_REQUEST = 400
  * every split: generation is roughly quadratic, so 5 000 parcels takes ~1.6 s
  * and 12 000 takes ~9 s.
  */
-const DEFAULT_SIZES = 'everyday:80,busy:800,large:5000,xlarge:12000'
+const DEFAULT_SIZES = 'normal:80,busy:800,large:5000,xlarge:12000'
 
 /**
  * The size labels the JMeter plan is wired to.
  *
- * `scenarios/bng-perf.jmx` reads `uploadId_everyday` / `_busy` / `_large` /
+ * `scenarios/bng-perf.jmx` reads `uploadId_normal` / `_busy` / `_large` /
  * `_xlarge` by name, one hard-coded sampler each, and every concurrency phase
  * reads `uploadId_large`. So UPLOAD_SIZES sets how big each step is — that is
  * what it is for — but not what the steps are called. A label the plan does not
@@ -80,7 +108,7 @@ const DEFAULT_SIZES = 'everyday:80,busy:800,large:5000,xlarge:12000'
  * segment. Neither shows up as anything but bad numbers in the report, so both
  * are rejected here, before a run is spent on them.
  */
-const PLAN_SIZE_LABELS = ['everyday', 'busy', 'large', 'xlarge']
+const PLAN_SIZE_LABELS = ['normal', 'busy', 'large', 'xlarge']
 
 /**
  * Labels become `-JuploadId_<label>=` arguments, and entrypoint.sh deliberately
@@ -288,6 +316,185 @@ async function stageOneSize({ label, parcels }) {
 }
 
 /**
+ * Parse `label:count` pairs, e.g. `normal:10,large:5`.
+ *
+ * Shares the strictness of parseSizes for the same reason: a silently dropped
+ * entry leaves a phase with no pool and no explanation anywhere.
+ */
+export function parsePreparedSizes(spec) {
+  return String(spec || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [label, count] = entry.split(':')
+      const parsed = { label: (label ?? '').trim(), count: Number(count) }
+      if (!LABEL_PATTERN.test(parsed.label)) {
+        throw new Error(
+          `bad label in PREPARED_SIZES entry "${entry}" — labels must match ${LABEL_PATTERN}`
+        )
+      }
+      if (!Number.isInteger(parsed.count) || parsed.count <= 0) {
+        throw new Error(
+          `bad count in PREPARED_SIZES entry "${entry}" — expected <label>:<positive integer>`
+        )
+      }
+      return parsed
+    })
+}
+
+/**
+ * The habitat features of a project that are safe to edit repeatedly.
+ *
+ * "Safe" means every attribute the PUT sends is already present: the edit
+ * writes the feature's own values back, so a feature missing one of them would
+ * send a blank, and `normalizeEdits` turns a blank into a null — which is a
+ * different edit from the no-op this is meant to be, and would drift the
+ * document over a run rather than measuring the same write repeatedly.
+ *
+ * Generated files cannot carry out-of-scope (High / V.High) distinctiveness —
+ * bng-library draws from IN_SCOPE_HABITATS — so the 422 gate in
+ * applyFeatureUpdate is not reachable from a fixture. The filter is about
+ * completeness, not scope.
+ *
+ * @param {object} project the `project` document from GET /projects/{id}
+ * @returns {{featureId: string, broadType: string, habitatType: string, condition: string}[]}
+ */
+export function editableHabitats(project) {
+  const habitats = project?.baseline?.habitats ?? []
+  return habitats
+    .filter(
+      (f) => f?.featureId && f.broadType && f.type && f.condition
+    )
+    .map((f) => ({
+      featureId: f.featureId,
+      broadType: f.broadType,
+      habitatType: f.type,
+      condition: f.condition
+    }))
+}
+
+/**
+ * CSV-quote a field.
+ *
+ * Habitat and condition names are free text from the reference data — "Other
+ * neutral grassland", and nothing today contains a comma, but nothing stops one
+ * appearing either. An unquoted comma would shift every later column by one and
+ * the edit ladder would PUT a condition into the habitatType field, which reads
+ * in the report as a validation failure rather than as a broken CSV. The
+ * matching CSVDataSet elements set quotedData=true.
+ */
+function csvField(value) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`
+}
+
+function writeCsv(path, rows) {
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, rows.map((row) => row.map(csvField).join(',')).join('\n') + '\n')
+}
+
+/**
+ * Create N projects and validate the staged baseline into each of them.
+ *
+ * The same `uploadId` is validated into every project. That is deliberate and
+ * it is what makes this affordable: the bytes are uploaded and scanned once,
+ * and `/baseline/validate/{uploadId}` is not single-use — it reads the object
+ * from S3 each time. Uploading N copies would multiply the slowest part of
+ * staging by N for no difference in the resulting documents.
+ *
+ * Sequential, like the rest of staging: this is setup, and running it
+ * concurrently would put the burst we are about to measure onto the service
+ * before the measurement starts.
+ */
+async function preparePool({ label, count, uploadId }) {
+  const projects = []
+  for (let i = 0; i < count; i++) {
+    const created = await postJson(`${API_BASE_URL}/projects/new`, {
+      project: { name: `perf ${label} prepared ${i + 1}` }
+    })
+    const result = await postJson(
+      `${API_BASE_URL}/baseline/validate/${uploadId}`,
+      { projectId: created.id }
+    )
+    if (!result?.valid) {
+      throw new Error(
+        `baseline did not validate into ${created.id}: ${JSON.stringify(result).slice(0, 300)}`
+      )
+    }
+    projects.push(created.id)
+  }
+  return projects
+}
+
+/**
+ * Turn prepared projects into the CSV row set the edit, post-intervention and
+ * mixed groups read.
+ *
+ * One row per project, because those groups need each concurrent thread on a
+ * DIFFERENT project — validation and editing both serialise on the project row
+ * lock, so two threads sharing a project would measure the lock rather than the
+ * work. The feature is fetched per project rather than assumed shared: the
+ * files are identical, but featureIds are minted at validation time and differ
+ * between projects.
+ */
+async function preparedRows(projectIds) {
+  const rows = []
+  for (const projectId of projectIds) {
+    const project = await getJson(`${API_BASE_URL}/projects/${projectId}`)
+    const [feature] = editableHabitats(project?.project)
+    if (!feature) {
+      process.stderr.write(
+        `  ! ${projectId} has no fully-attributed habitat to edit — excluded from the pool\n`
+      )
+      continue
+    }
+    rows.push([
+      projectId,
+      feature.featureId,
+      feature.broadType,
+      feature.habitatType,
+      feature.condition
+    ])
+  }
+  return rows
+}
+
+/**
+ * Stage the post-intervention half of the pair.
+ *
+ * `deriveBaselineFromSynthetic` produces the baseline BY CLEARING the proposed
+ * columns of a synthetic file, so regenerating the pair at the same seed
+ * reproduces both halves — the baseline half byte-identical to the committed
+ * fixture already staged, and the post-intervention half sharing its redline
+ * and every feature ref. That shared-ref property is the whole point: the
+ * backend reconciles a post-intervention upload against the stored baseline,
+ * and an independently generated file would reconcile against nothing.
+ */
+async function stagePostIntervention({ label, parcels }) {
+  const baselinePath = join(STAGE_DIR, `pair-baseline-${label}.gpkg`)
+  const piPath = join(STAGE_DIR, `post-intervention-${label}.gpkg`)
+  const { postIntervention } = makeGeoPackagePair(baselinePath, piPath, parcels)
+  process.stderr.write(
+    `▸ ${label} post-intervention: ${parcels} parcels, ` +
+      `${(postIntervention.bytes / 1024).toFixed(0)} KB ` +
+      `(generated in ${(postIntervention.generationMs / 1000).toFixed(1)}s) — uploading\n`
+  )
+  try {
+    const { uploadId, uploadUrl } = await initiateUpload()
+    await postFileToUploader(uploadUrl, piPath, postIntervention.bytes)
+    await waitForReady(uploadId)
+    process.stderr.write(`  ready: ${uploadId}\n`)
+    return uploadId
+  } finally {
+    // The baseline half was only ever needed to derive the other one — the
+    // committed fixture is what actually got staged — and neither has any
+    // reason to sit in the container for the rest of the run.
+    rmSync(baselinePath, { force: true })
+    rmSync(piPath, { force: true })
+  }
+}
+
+/**
  * Top up the owner's projects to a pool big enough that concurrent threads get
  * their own. Never deletes, so re-running a task does not pile rows up beyond
  * the target.
@@ -360,9 +567,136 @@ async function main() {
         '  Their phases will be skipped; the rest of the run continues.\n'
     )
   }
+
+  await stagePreparedPools(staged)
 }
 
-main().catch((err) => {
-  process.stderr.write(`stage-uploads failed: ${err.message}\n`)
-  process.exit(1)
-})
+/**
+ * Build the prepared pools, the post-intervention uploads and the contention
+ * project — everything the edit, fetch, post-intervention and mixed groups
+ * need, and nothing the plain upload ladders do.
+ *
+ * Per-size and best-effort, exactly like the upload staging above: a pool that
+ * cannot be built emits no property, entrypoint.sh sees the gap and skips the
+ * phases that needed it, and they are ABSENT from the report rather than
+ * present and wrong. A failure here never gates the run — the upload ladders,
+ * which are the bulk of it, need none of this.
+ */
+async function stagePreparedPools(staged) {
+  const wanted = parsePreparedSizes(PREPARED_SIZES)
+  if (wanted.length === 0) {
+    return
+  }
+  const stagedByLabel = new Map(staged.map((s) => [s.label, s]))
+  const piWanted = new Set(
+    PI_SIZES.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  )
+  let contentionWritten = false
+
+  for (const { label, count } of wanted) {
+    const size = stagedByLabel.get(label)
+    if (!size) {
+      process.stderr.write(
+        `  ! no staged ${label} upload — cannot prepare its pool\n`
+      )
+      continue
+    }
+    try {
+      process.stderr.write(
+        `▸ preparing ${count} ${label} project(s) — validating the staged baseline into each\n`
+      )
+      const projectIds = await preparePool({
+        label,
+        count,
+        uploadId: size.uploadId
+      })
+      const rows = await preparedRows(projectIds)
+      if (rows.length === 0) {
+        throw new Error('no prepared project yielded an editable habitat')
+      }
+      const csvPath = join(STAGE_DIR, `prepared-${label}.csv`)
+      writeCsv(csvPath, rows)
+      process.stdout.write(`preparedCsv_${label}=${csvPath}\n`)
+      // The fetch ramp wants ONE project per size — the first of the pool.
+      process.stdout.write(`sizedProjectId_${label}=${rows[0][0]}\n`)
+      process.stderr.write(
+        `  prepared ${rows.length}/${count} ${label} project(s) → ${csvPath}\n`
+      )
+
+      // The contention ladder needs many features of ONE project, and any
+      // prepared project will do. The first size to get this far provides it.
+      if (!contentionWritten) {
+        contentionWritten = await writeContentionPool(rows[0][0])
+      }
+    } catch (err) {
+      process.stderr.write(
+        `  ! ${label} pool did not prepare: ${err.message}\n` +
+          `    Its edit, fetch and post-intervention phases will be skipped.\n`
+      )
+      continue
+    }
+
+    if (piWanted.has(label)) {
+      try {
+        const uploadId = await stagePostIntervention({
+          label,
+          parcels: size.parcels
+        })
+        process.stdout.write(`piUploadId_${label}=${uploadId}\n`)
+      } catch (err) {
+        process.stderr.write(
+          `  ! ${label} post-intervention upload did not stage: ${err.message}\n`
+        )
+      }
+    }
+  }
+}
+
+/**
+ * Write the contention ladder's feature pool: many features, ONE project.
+ *
+ * Every row carries the same projectId — the plan reads it from a property
+ * rather than the CSV — so what the CSV supplies is the feature each thread
+ * edits. Different features of one project is the real contention case:
+ * `runUpdate` locks the PROJECT row, not the feature, so two people editing two
+ * separate habitats still serialise on it.
+ */
+async function writeContentionPool(projectId) {
+  const project = await getJson(`${API_BASE_URL}/projects/${projectId}`)
+  const features = editableHabitats(project?.project).slice(0, CONTENTION_FEATURES)
+  if (features.length === 0) {
+    process.stderr.write(
+      `  ! ${projectId} has no editable habitat — no contention pool\n`
+    )
+    return false
+  }
+  const csvPath = join(STAGE_DIR, 'contention.csv')
+  writeCsv(
+    csvPath,
+    features.map((f) => [
+      projectId,
+      f.featureId,
+      f.broadType,
+      f.habitatType,
+      f.condition
+    ])
+  )
+  process.stdout.write(`contentionProjectId=${projectId}\n`)
+  process.stdout.write(`contentionCsv=${csvPath}\n`)
+  process.stderr.write(
+    `▸ contention pool: ${features.length} feature(s) of ${projectId} → ${csvPath}\n`
+  )
+  return true
+}
+
+// Only stage when RUN as a script. The pure helpers above (label parsing, the
+// editable-habitat filter) are worth unit-testing, and importing this module to
+// reach them must not start uploading things.
+if (process.argv[1]?.endsWith('stage-uploads.mjs')) {
+  main().catch((err) => {
+    process.stderr.write(`stage-uploads failed: ${err.message}\n`)
+    process.exit(1)
+  })
+}

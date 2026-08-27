@@ -10,7 +10,10 @@
   },
   "scripts": {
     "gpkg": "node scripts/make-gpkg.mjs",
-    "gen-fixtures": "node scripts/gen-fixtures.mjs"
+    "gen-fixtures": "node scripts/gen-fixtures.mjs",
+    "gen-scenario": "node scripts/gen-scenario.mjs",
+    "check-scenario": "node scripts/gen-scenario.mjs --check",
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

@@ -4,6 +4,12 @@ set -x
 echo "run_id: $RUN_ID in $ENVIRONMENT"
 
 NOW=$(date +"%Y%m%d-%H%M%S")
+# Wall clock at task start. Everything before JMeter — minting a token, seeding,
+# staging four uploads through a virus scanner, building the prepared pools — is
+# time the person waiting is paying for, and none of it is in the plan's own
+# timeline. It is measured rather than assumed so the budget check below is
+# against what actually happened.
+TASK_STARTED_AT=$(date +%s)
 
 if [ -z "${JM_HOME}" ]; then
   JM_HOME=/opt/perftest
@@ -122,24 +128,61 @@ fi
 PROJECTS_CSV=${PROJECTS_CSV:-${JM_HOME}/stage/projects.csv}
 
 # ── Phase schedule ───────────────────────────────────────────────────────────
-# The upload phases run one after another, and JMeter starts a thread group at an
+# The load phases run one after another, and JMeter starts a thread group at an
 # ABSOLUTE delay from the start of the run. Writing those delays out by hand means
 # every duration change has to be propagated to every later phase; miss one and the
 # phases overlap, which does not fail anything — it just makes a concurrency figure
 # quietly stop meaning what its label says. So the delays are DERIVED: choose the
 # durations, and the start times fall out of them.
 #
-# The durations below add up to a ~5 minute run — short enough that a change can be
-# measured while you wait for it. Want more samples behind a percentile? Lengthen
-# the phase you care about and the rest of the timeline follows; there is no second
-# "deep" profile to remember, because a duration IS the knob.
+# What CHANGED: the plan now holds 53 ladder steps rather than 8, and writing a
+# duration per step here would be the same copy-paste problem the .jmx had. So
+# the durations are derived too — from how many samples a step is meant to
+# produce (see scenarios/ladders.config.mjs) — and arrive precomputed per
+# profile in scenarios/ladders.sh. This file still owns the one piece of
+# arithmetic that has to stay at run time: turning a list of windows into
+# absolute start delays, so changing PHASE_GAP_SECONDS or one window still
+# slides everything after it.
+# A missing ladders.sh would otherwise fail as a bare `.` with no explanation,
+# and the whole schedule lives in it — there is no partial run without it.
+if [ ! -f "${JM_SCENARIOS}/ladders.sh" ]; then
+  echo "ERROR: ${JM_SCENARIOS}/ladders.sh not found. It is generated from" >&2
+  echo "       scenarios/ladders.config.mjs — run \`npm run gen-scenario\` and commit it." >&2
+  exit 1
+fi
+. "${JM_SCENARIOS}/ladders.sh"
+
+# Which steps run, and how deeply they sample. There is exactly one profile —
+# `standard` (scenarios/ladders.config.mjs is the single source of what it
+# runs) — but the machinery stays name-driven so ladders.sh remains the only
+# authority on what exists. A profile never changes what the plan CONTAINS —
+# every step has a thread group either way — it sets thread counts, and a step
+# at 0 threads costs nothing and reserves no wall clock.
+PERF_PROFILE=${PERF_PROFILE:-${PERF_PROFILE_DEFAULT}}
+profile_is_known() {
+  for known in ${PERF_PROFILE_NAMES}; do
+    if [ "${known}" = "$1" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+if ! profile_is_known "${PERF_PROFILE}"; then
+  echo "ERROR: unknown PERF_PROFILE '${PERF_PROFILE}' — expected one of: ${PERF_PROFILE_NAMES}" >&2
+  exit 1
+fi
+
+# Read a generated per-profile value. The keys come from ladders.sh, which this
+# repo generates, so they are known-safe identifiers rather than operator input.
+profile_value() {
+  eval "printf '%s' \"\${PROFILE_$1_${PERF_PROFILE}_$2:-$3}\""
+}
 
 # The two everyday groups are loop-count driven (home 1x5, list 10x20 over a 10s
 # ramp), so this cap only bites when the backend is slow. It is a guard, not a
 # budget — the groups end when their loops do.
 EVERYDAY_PHASE_DURATION_SECONDS=${EVERYDAY_PHASE_DURATION_SECONDS:-25}
 PROBE_BASELINE_SECONDS=${PROBE_BASELINE_SECONDS:-25}
-CONC_STEP_DURATION_SECONDS=${CONC_STEP_DURATION_SECONDS:-30}
 
 # The size ramp is the one phase that is LOOP-COUNT driven inside a duration
 # guard rather than simply running for its window: it makes a fixed, weighted
@@ -160,7 +203,7 @@ CONC_STEP_DURATION_SECONDS=${CONC_STEP_DURATION_SECONDS:-30}
 # ramp simply ends; the cost of being generous is dead air before the next
 # phase, which is why summarise-run.mjs reports how much of the window the ramp
 # actually used. Tighten them from that number after the first real run.
-SIZE_ALLOWANCE_EVERYDAY_SECONDS=${SIZE_ALLOWANCE_EVERYDAY_SECONDS:-2}
+SIZE_ALLOWANCE_NORMAL_SECONDS=${SIZE_ALLOWANCE_NORMAL_SECONDS:-2}
 SIZE_ALLOWANCE_BUSY_SECONDS=${SIZE_ALLOWANCE_BUSY_SECONDS:-4}
 SIZE_ALLOWANCE_LARGE_SECONDS=${SIZE_ALLOWANCE_LARGE_SECONDS:-12}
 SIZE_ALLOWANCE_XLARGE_SECONDS=${SIZE_ALLOWANCE_XLARGE_SECONDS:-26}
@@ -168,14 +211,17 @@ SIZE_ALLOWANCE_XLARGE_SECONDS=${SIZE_ALLOWANCE_XLARGE_SECONDS:-26}
 # The weights themselves. Defaulted HERE rather than only in the .jmx, because
 # the window derivation needs them; they are still passed through as properties,
 # so the plan's own defaults stay the fallback for a direct JMeter run.
+#
+# The weights default from the profile rather than from a fixed number, so
+# ladders.config.mjs stays the one place the ramp's depth is decided.
 SIZE_RAMP_THREADS=${SIZE_RAMP_THREADS:-1}
 SIZE_RAMP_LOOPS=${SIZE_RAMP_LOOPS:-1}
-SIZE_LOOPS_EVERYDAY=${SIZE_LOOPS_EVERYDAY:-20}
-SIZE_LOOPS_BUSY=${SIZE_LOOPS_BUSY:-8}
-SIZE_LOOPS_LARGE=${SIZE_LOOPS_LARGE:-3}
-SIZE_LOOPS_XLARGE=${SIZE_LOOPS_XLARGE:-2}
+SIZE_LOOPS_NORMAL=${SIZE_LOOPS_NORMAL:-$(profile_value SIZE_LOOPS normal 20)}
+SIZE_LOOPS_BUSY=${SIZE_LOOPS_BUSY:-$(profile_value SIZE_LOOPS busy 8)}
+SIZE_LOOPS_LARGE=${SIZE_LOOPS_LARGE:-$(profile_value SIZE_LOOPS large 3)}
+SIZE_LOOPS_XLARGE=${SIZE_LOOPS_XLARGE:-$(profile_value SIZE_LOOPS xlarge 2)}
 
-SIZE_RAMP_PASS_SECONDS=$(( SIZE_LOOPS_EVERYDAY * SIZE_ALLOWANCE_EVERYDAY_SECONDS \
+SIZE_RAMP_PASS_SECONDS=$(( SIZE_LOOPS_NORMAL * SIZE_ALLOWANCE_NORMAL_SECONDS \
   + SIZE_LOOPS_BUSY * SIZE_ALLOWANCE_BUSY_SECONDS \
   + SIZE_LOOPS_LARGE * SIZE_ALLOWANCE_LARGE_SECONDS \
   + SIZE_LOOPS_XLARGE * SIZE_ALLOWANCE_XLARGE_SECONDS ))
@@ -189,7 +235,13 @@ SIZE_RAMP_DURATION_SECONDS=${SIZE_RAMP_DURATION_SECONDS:-$(( SIZE_RAMP_PASS_SECO
 
 # Dead time between phases, so the previous step's in-flight requests drain before
 # the next one starts and its latencies are not charged to the wrong phase.
-PHASE_GAP_SECONDS=${PHASE_GAP_SECONDS:-5}
+#
+# Set explicitly, it applies to EVERY phase — asking for a uniform gap, and from
+# there the arithmetic is yours. Left unset, each phase gets its own drain time
+# derived from what one of its iterations costs, and this value is used only at
+# the boundaries around the hand-written phases.
+PHASE_GAP_SECONDS_OVERRIDE=${PHASE_GAP_SECONDS}
+PHASE_GAP_SECONDS=${PHASE_GAP_SECONDS:-${PHASE_GAP_SECONDS_DEFAULT}}
 
 # Each phase starts a gap after the previous one ends. An explicitly-set delay is
 # honoured as-is: override one and you own the arithmetic from there on.
@@ -198,37 +250,224 @@ PROBE_DELAY_SECONDS=${PROBE_DELAY_SECONDS:-$((EVERYDAY_PHASE_DURATION_SECONDS + 
 # first load phase — that is what every loaded phase is compared against.
 SIZE_RAMP_DELAY_SECONDS=${SIZE_RAMP_DELAY_SECONDS:-$((PROBE_DELAY_SECONDS + PROBE_BASELINE_SECONDS))}
 
-PHASE_CURSOR=$((SIZE_RAMP_DELAY_SECONDS + SIZE_RAMP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-CONC_DELAY_1=${CONC_DELAY_1:-${PHASE_CURSOR}}
-PHASE_CURSOR=$((CONC_DELAY_1 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-CONC_DELAY_2=${CONC_DELAY_2:-${PHASE_CURSOR}}
-PHASE_CURSOR=$((CONC_DELAY_2 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-CONC_DELAY_5=${CONC_DELAY_5:-${PHASE_CURSOR}}
-PHASE_CURSOR=$((CONC_DELAY_5 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-CONC_DELAY_10=${CONC_DELAY_10:-${PHASE_CURSOR}}
-PHASE_CURSOR=$((CONC_DELAY_10 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-CONC_DELAY_20=${CONC_DELAY_20:-${PHASE_CURSOR}}
+# ── The ladder walk ─────────────────────────────────────────────────────────
+# Every ladder step, the fetch ramp and the mixed workload are scheduled here,
+# in one loop, from the profile's phase list. This is the whole of what used to
+# be twenty hand-written CONC_DELAY_* / JOURNEY_DELAY_* lines — and it is what
+# makes a 53-step plan cost the same maintenance as an 8-step one.
+#
+# Three properties per phase, and one accumulator:
+#   users_<key>   threads, from the profile (0 for a step it does not run)
+#   window_<key>  how long it runs, precomputed from its target sample count
+#   delay_<key>   when it starts — accumulated here, gap included
+#
+# A phase the profile leaves out never enters the loop, so it reserves no wall
+# clock. That is the same contract SIZE_RAMP_THREADS=0 already had, applied to
+# every step rather than to one phase.
+# Start from every phase zeroed, so a step the profile omits is inert rather
+# than falling back to the .jmx default (which would quietly run a step the
+# profile deliberately left out).
+for phase_key in ${ALL_PHASE_KEYS}; do
+  eval "PHASE_USERS_${phase_key}=0"
+  eval "PHASE_WINDOW_${phase_key}=0"
+  eval "PHASE_DELAY_${phase_key}=0"
+done
 
-# The upload-journey staircase: a real upload per iteration — initiate,
-# multipart POST to the CDP Uploader, validate — so the uploader and its virus
-# scan are measured end to end, where the validate staircase above replays a
-# pre-staged upload to isolate the service's own cost. Scheduled after the
-# concurrency ramp; each step's users all drive the everyday-sized fixture.
-JOURNEY_STEP_DURATION_SECONDS=${JOURNEY_STEP_DURATION_SECONDS:-30}
-JOURNEY_USERS_1=${JOURNEY_USERS_1:-1}
-JOURNEY_USERS_2=${JOURNEY_USERS_2:-2}
-JOURNEY_USERS_5=${JOURNEY_USERS_5:-5}
-PHASE_CURSOR=$((CONC_DELAY_20 + CONC_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-JOURNEY_DELAY_1=${JOURNEY_DELAY_1:-${PHASE_CURSOR}}
-PHASE_CURSOR=$((JOURNEY_DELAY_1 + JOURNEY_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-JOURNEY_DELAY_2=${JOURNEY_DELAY_2:-${PHASE_CURSOR}}
-PHASE_CURSOR=$((JOURNEY_DELAY_2 + JOURNEY_STEP_DURATION_SECONDS + PHASE_GAP_SECONDS))
-JOURNEY_DELAY_5=${JOURNEY_DELAY_5:-${PHASE_CURSOR}}
+eval "PROFILE_PHASE_LIST=\${PROFILE_PHASES_${PERF_PROFILE}}"
+for phase_key in ${PROFILE_PHASE_LIST}; do
+  # The mixed workload is a workload rather than a staircase step, so it has no
+  # user count in the ladder tables and takes MIX_THREADS instead.
+  if [ "${phase_key}" = "mixed" ]; then
+    phase_users=${MIX_THREADS:-${MIXED_THREADS_DEFAULT}}
+    eval "phase_window=\${PROFILE_WINDOW_${PERF_PROFILE}_mixed}"
+  else
+    eval "phase_users=\${PROFILE_USERS_${PERF_PROFILE}_${phase_key}}"
+    eval "phase_window=\${PROFILE_WINDOW_${PERF_PROFILE}_${phase_key}}"
+  fi
 
-# The probe has to outlive the last phase or the tail of the run is unobserved —
-# which is exactly where an availability problem would show up.
-RUN_END_SECONDS=$((JOURNEY_DELAY_5 + JOURNEY_STEP_DURATION_SECONDS))
-PROBE_DURATION_SECONDS=${PROBE_DURATION_SECONDS:-$((RUN_END_SECONDS - PROBE_DELAY_SECONDS))}
+  # An explicit WINDOW_<key> override is honoured as-is and the timeline
+  # re-derives around it — set durations, not delays, as everywhere else here.
+  eval "phase_window=\${WINDOW_${phase_key}:-\${phase_window}}"
+
+  eval "PHASE_USERS_${phase_key}=${phase_users}"
+  eval "PHASE_WINDOW_${phase_key}=${phase_window}"
+done
+
+# The fetch ramp is loop-count driven inside its window, like the size ramp, so
+# its per-size counts come from the profile rather than from a thread count.
+for upload_label in ${LADDER_SIZES}; do
+  eval "FETCH_LOOPS_${upload_label}=\$(profile_value FETCH_LOOPS ${upload_label} 0)"
+done
+
+# Turn the windows into absolute start delays.
+#
+# This is a FUNCTION rather than a straight-line loop because it has to run
+# twice: once here, so the config banner can state the schedule before anything
+# slow happens, and again after staging, which is what decides whether a phase
+# has anything to run against at all. A step zeroed by staging is skipped on the
+# second pass, so it hands its window back to the run instead of leaving dead
+# air every later phase is pushed out by — the same reclaim SIZE_RAMP_THREADS=0
+# already got.
+derive_ladder_delays() {
+  PHASE_CURSOR=$((SIZE_RAMP_DELAY_SECONDS + SIZE_RAMP_DURATION_SECONDS + PHASE_GAP_SECONDS))
+  LADDER_PHASE_COUNT=0
+  last_gap=${PHASE_GAP_SECONDS}
+  for phase_key in ${PROFILE_PHASE_LIST}; do
+    eval "phase_users=\${PHASE_USERS_${phase_key}}"
+    eval "phase_window=\${PHASE_WINDOW_${phase_key}}"
+    if [ "${phase_users}" = "0" ] || [ "${phase_window}" = "0" ]; then
+      eval "PHASE_DELAY_${phase_key}=0"
+      continue
+    fi
+    # Each phase's own drain time — roughly one in-flight request — unless the
+    # operator set PHASE_GAP_SECONDS, which asks for a uniform one.
+    if [ -n "${PHASE_GAP_SECONDS_OVERRIDE}" ]; then
+      phase_gap=${PHASE_GAP_SECONDS_OVERRIDE}
+    else
+      eval "phase_gap=\${PROFILE_GAP_${PERF_PROFILE}_${phase_key}:-${PHASE_GAP_SECONDS}}"
+    fi
+    eval "PHASE_DELAY_${phase_key}=${PHASE_CURSOR}"
+    PHASE_CURSOR=$((PHASE_CURSOR + phase_window + phase_gap))
+    last_gap=${phase_gap}
+    LADDER_PHASE_COUNT=$((LADDER_PHASE_COUNT + 1))
+  done
+
+  # The last gap is dead air after the final phase, so the run ends a gap early.
+  if [ ${LADDER_PHASE_COUNT} -gt 0 ]; then
+    RUN_END_SECONDS=$((PHASE_CURSOR - last_gap))
+  else
+    RUN_END_SECONDS=$((SIZE_RAMP_DELAY_SECONDS + SIZE_RAMP_DURATION_SECONDS))
+  fi
+
+  # The probe has to outlive the last phase or the tail of the run is
+  # unobserved — which is exactly where an availability problem would show up.
+  # Re-derived with the rest, so a reclaimed window shortens the probe too.
+  PROBE_DURATION_SECONDS=${PROBE_DURATION_SECONDS_OVERRIDE:-$((RUN_END_SECONDS - PROBE_DELAY_SECONDS))}
+}
+
+# ── Budgets and timeouts for the new groups ─────────────────────────────────
+# A budget is a RED LINE in the report, not a cap on the request; the timeout is
+# the point past which a sample is an error rather than a slow success.
+#
+# JOURNEY_BUDGET_MS deliberately sits ABOVE the backend's own scan wait.
+# waitForUploadReady gives up at 30s and throws UploadTimeoutError, which the
+# route turns into a 504 — so a budget below 30s made the journey's failure mode
+# a red *assertion* at 20s rather than a slow sample, and "the scan queue backed
+# up" read in the report as "the service broke". 35s puts the budget on the far
+# side of that, so a red duration here means slow and a red status means broken.
+JOURNEY_BUDGET_MS=${JOURNEY_BUDGET_MS:-35000}
+JOURNEY_LARGE_BUDGET_MS=${JOURNEY_LARGE_BUDGET_MS:-60000}
+EDIT_BUDGET_MS=${EDIT_BUDGET_MS:-3000}
+EDIT_RESPONSE_TIMEOUT_MS=${EDIT_RESPONSE_TIMEOUT_MS:-30000}
+FETCH_BUDGET_MS=${FETCH_BUDGET_MS:-5000}
+FETCH_RESPONSE_TIMEOUT_MS=${FETCH_RESPONSE_TIMEOUT_MS:-60000}
+INITIATE_RESPONSE_TIMEOUT_MS=${INITIATE_RESPONSE_TIMEOUT_MS:-30000}
+UPLOAD_RESPONSE_TIMEOUT_MS=${UPLOAD_RESPONSE_TIMEOUT_MS:-120000}
+
+# The mixed workload's weights, as percent of iterations. They should add up to
+# 100 — ThroughputController does not require it, but a mix that does not is a
+# mix nobody can reason about.
+MIX_LIST_PERCENT=${MIX_LIST_PERCENT:-40}
+MIX_FETCH_PERCENT=${MIX_FETCH_PERCENT:-25}
+MIX_EDIT_PERCENT=${MIX_EDIT_PERCENT:-25}
+MIX_VALIDATE_PERCENT=${MIX_VALIDATE_PERCENT:-10}
+MIX_THINK_MS=${MIX_THINK_MS:-500}
+MIX_TOTAL_PERCENT=$((MIX_LIST_PERCENT + MIX_FETCH_PERCENT + MIX_EDIT_PERCENT + MIX_VALIDATE_PERCENT))
+if [ ${MIX_TOTAL_PERCENT} -ne 100 ]; then
+  echo "WARNING: the mixed-workload weights add up to ${MIX_TOTAL_PERCENT}%, not 100% — the mix will not be the one you asked for" >&2
+fi
+
+# An operator-set PROBE_DURATION_SECONDS is honoured as-is; kept in its own
+# variable so the re-derivation above cannot overwrite it on the second pass.
+PROBE_DURATION_SECONDS_OVERRIDE=${PROBE_DURATION_SECONDS}
+derive_ladder_delays
+
+# A one-line, human-readable form of the schedule the walk just derived —
+# "journey_normal_1@1u/24s, journey_normal_2@2u/12s, …" — so a run can be
+# triaged from the first screen of logs without counting delays by hand.
+LADDER_SCHEDULE_SUMMARY=""
+for phase_key in ${PROFILE_PHASE_LIST}; do
+  eval "phase_users=\${PHASE_USERS_${phase_key}}"
+  eval "phase_window=\${PHASE_WINDOW_${phase_key}}"
+  if [ "${phase_users}" = "0" ]; then
+    continue
+  fi
+  LADDER_SCHEDULE_SUMMARY="${LADDER_SCHEDULE_SUMMARY}${phase_key}@${phase_users}u/${phase_window}s "
+done
+
+# ── What staging has to prepare ─────────────────────────────────────────────
+# The edit, post-intervention, fetch and mixed groups all need PREPARED
+# projects — ones that already hold a validated baseline — because an empty
+# project has no feature to edit, no document worth fetching and no baseline for
+# a post-intervention upload to reconcile against.
+#
+# How many is derived from the profile rather than fixed, because preparing a
+# pool is not free: each project costs a validate of that size's file, and a
+# `large` pool is a 4 MB validate per project. A profile that does not run the
+# large edit ladder should not spend that setup time on it.
+#
+# The rule: a size needs as many prepared projects as the widest step that will
+# read them, because those groups need each concurrent thread on a DIFFERENT
+# project — they serialise on the project row lock otherwise, and would measure
+# the lock instead of the work.
+PREPARED_SIZES=""
+PI_SIZES=""
+CONTENTION_FEATURES=${CONTENTION_FEATURES:-20}
+for upload_label in ${LADDER_SIZES}; do
+  prepared_needed=0
+  pi_needed=0
+  for phase_key in ${ALL_PHASE_KEYS}; do
+    eval "phase_users=\${PHASE_USERS_${phase_key}}"
+    if [ "${phase_users:-0}" -eq 0 ]; then
+      continue
+    fi
+    case "${phase_key}" in
+      "edit_${upload_label}_"*)
+        if [ "${phase_users}" -gt ${prepared_needed} ]; then
+          prepared_needed=${phase_users}
+        fi
+        ;;
+      "pi_${upload_label}_"*)
+        pi_needed=1
+        if [ "${phase_users}" -gt ${prepared_needed} ]; then
+          prepared_needed=${phase_users}
+        fi
+        ;;
+      *) ;;
+    esac
+  done
+
+  # The mixed workload reads the normal pool, one project per thread.
+  if [ "${upload_label}" = "normal" ] && [ "${PHASE_USERS_mixed:-0}" -gt ${prepared_needed} ]; then
+    prepared_needed=${PHASE_USERS_mixed}
+  fi
+  # The fetch ramp only needs ONE project of each size it loops over.
+  eval "fetch_loops=\${FETCH_LOOPS_${upload_label}:-0}"
+  if [ "${fetch_loops}" -gt 0 ] && [ ${prepared_needed} -eq 0 ]; then
+    prepared_needed=1
+  fi
+  # The contention ladder edits ONE project, and any prepared one will do.
+  if [ "${upload_label}" = "normal" ] && [ ${prepared_needed} -eq 0 ]; then
+    for phase_key in ${ALL_PHASE_KEYS}; do
+      case "${phase_key}" in
+        editContention_*)
+          eval "phase_users=\${PHASE_USERS_${phase_key}}"
+          if [ "${phase_users:-0}" -gt 0 ]; then
+            prepared_needed=1
+          fi
+          ;;
+        *) ;;
+      esac
+    done
+  fi
+
+  if [ ${prepared_needed} -gt 0 ]; then
+    PREPARED_SIZES="${PREPARED_SIZES}${PREPARED_SIZES:+,}${upload_label}:${prepared_needed}"
+  fi
+  if [ ${pi_needed} -eq 1 ]; then
+    PI_SIZES="${PI_SIZES}${PI_SIZES:+,}${upload_label}"
+  fi
+done
 
 # One-shot run-config banner. xtrace off so it reads as a clean block and so no
 # secret can ever be echoed here. Surfaces the resolved config up front — the
@@ -247,19 +486,54 @@ echo "  oidc redirect_uri:   ${OIDC_REDIRECT_URI}"
 echo "  seed via API:        ${SEED_VIA_API} (target ${SEED_PROJECT_COUNT:-5} project(s))"
 echo "  create load:         ${CREATE_THREADS}t x ${CREATE_LOOPS}L x ${CREATE_PARCELS} parcels, plus ${CREATE_LARGE_LOOPS} probe(s) x ${CREATE_LARGE_PARCELS} parcels"
 echo "  create growth:       up to ~${GROWTH_KIB} KiB added by this run (bng.projects + append-only bng.audit_log — NOT reclaimable; excludes upload phases)"
-echo "  nominal run:         ${RUN_END_SECONDS}s"
+echo "  nominal run:         ${RUN_END_SECONDS}s (~$((RUN_END_SECONDS / 60)) min)"
 echo "  phase schedule:      everyday 0-${EVERYDAY_PHASE_DURATION_SECONDS}s | probe ${PROBE_DELAY_SECONDS}s+${PROBE_DURATION_SECONDS}s | ramp ${SIZE_RAMP_DELAY_SECONDS}s+${SIZE_RAMP_DURATION_SECONDS}s"
-echo "                       conc ${CONC_DELAY_1}/${CONC_DELAY_2}/${CONC_DELAY_5}/${CONC_DELAY_10}/${CONC_DELAY_20}s, ${CONC_STEP_DURATION_SECONDS}s each"
-echo "                       journey ${JOURNEY_DELAY_1}/${JOURNEY_DELAY_2}/${JOURNEY_DELAY_5}s at ${JOURNEY_USERS_1}/${JOURNEY_USERS_2}/${JOURNEY_USERS_5} user(s), ${JOURNEY_STEP_DURATION_SECONDS}s each"
-echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_EVERYDAY}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (everyday/busy/large/xlarge)"
-echo "                       derived from ${SIZE_ALLOWANCE_EVERYDAY_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
+eval "BANNER_BUDGET_SECONDS=\${PROFILE_BUDGET_SECONDS_${PERF_PROFILE}:-0}"
+if [ "${BANNER_BUDGET_SECONDS}" -gt 0 ]; then
+  BANNER_BUDGET="budget $((BANNER_BUDGET_SECONDS / 60)) min incl. setup"
+else
+  BANNER_BUDGET="no budget — this profile is meant to be long"
+fi
+echo "  profile:             ${PERF_PROFILE} — ${LADDER_PHASE_COUNT} ladder phase(s), ${BANNER_BUDGET}"
+echo "                       ${LADDER_SCHEDULE_SUMMARY}"
+echo "  size-ramp window:    ${SIZE_RAMP_DURATION_SECONDS}s for ${SIZE_RAMP_LOOPS} pass(es) of ${SIZE_LOOPS_NORMAL}/${SIZE_LOOPS_BUSY}/${SIZE_LOOPS_LARGE}/${SIZE_LOOPS_XLARGE} (normal/busy/large/xlarge)"
+echo "                       derived from ${SIZE_ALLOWANCE_NORMAL_SECONDS}/${SIZE_ALLOWANCE_BUSY_SECONDS}/${SIZE_ALLOWANCE_LARGE_SECONDS}/${SIZE_ALLOWANCE_XLARGE_SECONDS}s allowed per validate — the summary reports how much was used"
 echo "  stage uploads:       ${STAGE_UPLOADS}"
+echo "  prepared pools:      ${PREPARED_SIZES:-<none>} (projects pre-loaded with a baseline, for the edit/fetch/post-intervention groups)"
+echo "  post-intervention:   ${PI_SIZES:-<none>}"
 if [ "${STAGE_UPLOADS}" = "true" ]; then
   echo "  cdp-uploader:        ${CDP_UPLOADER_URL}"
-  echo "  upload sizes:        ${UPLOAD_SIZES:-<defaults: everyday,busy,large,xlarge>}"
+  echo "  upload sizes:        ${UPLOAD_SIZES:-<defaults: normal,busy,large,xlarge>}"
 fi
 echo "────────────────────────────────────────────────────────────────────────────────────"
 set -x
+
+# Print the resolved schedule and stop, without touching the network.
+#
+# The plan holds 53 ladder steps whose windows and delays are all derived, so
+# "what would this profile actually run, and for how long?" is a question worth
+# being able to ask before spending a run finding out. It is also what the test
+# suite compares the shell's arithmetic against the generator's — the two derive
+# the same schedule independently, and this is where they are checked to agree.
+if [ "${PERF_DUMP_SCHEDULE}" = "true" ]; then
+  set +x
+  for phase_key in ${PROFILE_PHASE_LIST}; do
+    eval "phase_users=\${PHASE_USERS_${phase_key}}"
+    eval "phase_window=\${PHASE_WINDOW_${phase_key}}"
+    eval "phase_delay=\${PHASE_DELAY_${phase_key}}"
+    if [ "${phase_users}" = "0" ]; then
+      continue
+    fi
+    # Marker-prefixed: the config banner writes to stdout too, and a consumer
+    # of this has to be able to tell the two apart without parsing prose.
+    echo "PHASE ${phase_key} ${phase_users} ${phase_window} ${phase_delay}"
+  done
+  echo "TOTAL RUN_END ${RUN_END_SECONDS}"
+  echo "TOTAL PROBE ${PROBE_DELAY_SECONDS} ${PROBE_DURATION_SECONDS}"
+  echo "TOTAL PREPARED ${PREPARED_SIZES:-none}"
+  echo "TOTAL PI ${PI_SIZES:-none}"
+  exit 0
+fi
 
 # Mint the cdp-defra-id-stub token for the authenticated backend group. Sets
 # BEARER_TOKEN (and USER_ID to the minted sub when unset). No-op if BEARER_TOKEN
@@ -336,6 +610,9 @@ stage_uploads() {
   UPLOAD_SIZES="${UPLOAD_SIZES}" \
   PROJECT_POOL_SIZE="${PROJECT_POOL_SIZE}" \
   UPLOAD_READY_TIMEOUT_MS="${UPLOAD_READY_TIMEOUT_MS}" \
+  PREPARED_SIZES="${PREPARED_SIZES}" \
+  PI_SIZES="${PI_SIZES}" \
+  CONTENTION_FEATURES="${CONTENTION_FEATURES}" \
     node --no-warnings "${JM_HOME}/scripts/stage-uploads.mjs" > "${STAGE_OUT}"
   STAGE_STATUS=$?
   set -x
@@ -366,55 +643,143 @@ add_prop() {
   fi
 }
 
-# True when stage_uploads captured an uploadId for size label $1.
-staged_upload() {
+# True when stage_uploads emitted the property named $1.
+staged_prop() {
   case "${SCENARIO_PROPS}" in
-    *" -JuploadId_$1="*) return 0 ;;
+    *" -J$1="*) return 0 ;;
     *) return 1 ;;
   esac
 }
 
-# Zero the loop/thread count of any phase whose staged upload is missing.
+# True when stage_uploads captured an uploadId for size label $1.
+staged_upload() {
+  staged_prop "uploadId_$1"
+}
+
+# Zero every phase in the ladder whose key starts with $1.
 #
-# Without this a size that did not stage (or the whole set, when STAGE_UPLOADS
-# is false) leaves its sampler POSTing to `/baseline/validate/` with an empty
-# path segment: a phase's worth of 404s, recorded and reported exactly as though
-# the service had failed them. Skipping the phase means it is ABSENT from the
-# report rather than lying in it.
-#
-# `large` backs every concurrency phase as well as its own ramp step, so losing
-# it takes the whole concurrency half with it.
-disable_unstaged_phases() {
-  # The journey phases need no staged uploadId — each iteration uploads its own
-  # file — but they DO need the project pool staging builds and an uploader to
-  # POST to, so STAGE_UPLOADS=false suppresses them along with everything else.
-  if [ "${STAGE_UPLOADS}" != "true" ]; then
-    echo "▸ STAGE_UPLOADS is not true — skipping the upload-journey phases" >&2
-    JOURNEY_USERS_1=0
-    JOURNEY_USERS_2=0
-    JOURNEY_USERS_5=0
-  fi
-  for upload_label in everyday busy large xlarge; do
-    if staged_upload "${upload_label}"; then
-      continue
-    fi
-    echo "▸ no staged upload for '${upload_label}' — skipping its size-ramp step" >&2
-    case "${upload_label}" in
-      everyday) SIZE_LOOPS_EVERYDAY=0 ;;
-      busy) SIZE_LOOPS_BUSY=0 ;;
-      large) SIZE_LOOPS_LARGE=0 ;;
-      xlarge) SIZE_LOOPS_XLARGE=0 ;;
+# The keys are `<ladder>_<size>_<users>`, so a prefix names exactly one ladder,
+# or one ladder at one size. Zeroing the USER count is what suppresses a phase:
+# derive_ladder_delays then skips it, and it reserves no wall clock.
+disable_phases_matching() {
+  for phase_key in ${ALL_PHASE_KEYS}; do
+    case "${phase_key}" in
+      "$1"*) eval "PHASE_USERS_${phase_key}=0" ;;
+      *) ;;
     esac
   done
-  if staged_upload large; then
+}
+
+# Zero the loop/thread count of any phase whose prerequisite did not stage.
+#
+# Without this a phase whose fixture is missing (or the whole set, when
+# STAGE_UPLOADS is false) POSTs to `/baseline/validate/` with an empty path
+# segment: a phase's worth of 404s, recorded and reported exactly as though the
+# service had failed them. Skipping the phase means it is ABSENT from the report
+# rather than lying in it.
+#
+# Each ladder has a different prerequisite, and they are checked separately so
+# one missing fixture costs its own phases rather than the run:
+#
+#   size ramp / revalidate  uploadId_<size>       — a staged, scanned upload
+#   journey                 the project pool      — it uploads its own file
+#   post-intervention       piUploadId_<size>     — and the prepared pool below
+#   edit                    prepared-<size>.csv   — projects with a baseline in
+#                                                   them and a feature to edit
+#   edit contention         contentionProjectId   — one project, many features
+#   fetch ramp              sizedProjectId_<size> — a project of that size
+#   mixed                   prepared-normal.csv + uploadId_normal
+disable_unstaged_phases() {
+  # Nothing that touches an upload or a project pool can run without staging.
+  if [ "${STAGE_UPLOADS}" != "true" ]; then
+    echo "▸ STAGE_UPLOADS is not true — skipping every upload, edit and fetch phase" >&2
+    for phase_key in ${ALL_PHASE_KEYS}; do
+      eval "PHASE_USERS_${phase_key}=0"
+    done
+    for upload_label in ${LADDER_SIZES}; do
+      eval "FETCH_LOOPS_${upload_label}=0"
+    done
+    SIZE_LOOPS_NORMAL=0
+    SIZE_LOOPS_BUSY=0
+    SIZE_LOOPS_LARGE=0
+    SIZE_LOOPS_XLARGE=0
     return 0
   fi
-  echo "▸ no staged upload for 'large' — skipping every concurrency phase" >&2
-  CONC_USERS_1=0
-  CONC_USERS_2=0
-  CONC_USERS_5=0
-  CONC_USERS_10=0
-  CONC_USERS_20=0
+
+  for upload_label in ${LADDER_SIZES}; do
+    # The size ramp and the revalidate ladder both replay a staged upload.
+    if ! staged_upload "${upload_label}"; then
+      echo "▸ no staged upload for '${upload_label}' — skipping its size-ramp step and revalidate ladder" >&2
+      case "${upload_label}" in
+        normal) SIZE_LOOPS_NORMAL=0 ;;
+        busy) SIZE_LOOPS_BUSY=0 ;;
+        large) SIZE_LOOPS_LARGE=0 ;;
+        xlarge) SIZE_LOOPS_XLARGE=0 ;;
+      esac
+      disable_phases_matching "revalidate_${upload_label}_"
+    fi
+
+    # The journey uploads its own file every iteration, so what it needs is the
+    # committed fixture on disk rather than anything staged.
+    eval "journey_file=\${JOURNEY_FILE_$(printf '%s' "${upload_label}" | tr '[:lower:]' '[:upper:]')}"
+    journey_file=${journey_file:-${JM_HOME}/fixtures/baseline-${upload_label}.gpkg}
+    if [ ! -f "${journey_file}" ]; then
+      echo "▸ no fixture at ${journey_file} — skipping the '${upload_label}' journey ladder" >&2
+      disable_phases_matching "journey_${upload_label}_"
+    fi
+
+    # Post-intervention needs its own staged upload AND a prepared project to
+    # validate it into — a post-intervention document is only meaningful
+    # against a project that already holds the matching baseline.
+    if ! staged_prop "piUploadId_${upload_label}"; then
+      echo "▸ no staged post-intervention upload for '${upload_label}' — skipping its ladder" >&2
+      disable_phases_matching "pi_${upload_label}_"
+    fi
+
+    # The edit ladder and the fetch ramp both read the prepared pool.
+    if ! staged_prop "preparedCsv_${upload_label}"; then
+      echo "▸ no prepared project pool for '${upload_label}' — skipping its edit ladder, fetch step and post-intervention ladder" >&2
+      disable_phases_matching "edit_${upload_label}_"
+      disable_phases_matching "pi_${upload_label}_"
+      eval "FETCH_LOOPS_${upload_label}=0"
+    fi
+    if ! staged_prop "sizedProjectId_${upload_label}"; then
+      eval "FETCH_LOOPS_${upload_label}=0"
+    fi
+  done
+
+  if ! staged_prop contentionProjectId; then
+    echo "▸ no contention project — skipping the edit-contention ladder" >&2
+    disable_phases_matching "editContention_"
+  fi
+
+  # The mixed workload reads the prepared pool and revalidates the normal
+  # upload, so it needs both. It is the one group that would otherwise fail
+  # halfway through its weights rather than not run at all.
+  if ! staged_prop preparedCsv_normal || ! staged_upload normal; then
+    echo "▸ mixed workload needs the normal prepared pool and upload — skipping it" >&2
+    PHASE_USERS_mixed=0
+  fi
+
+  # The fetch ramp is loop-count driven, so it is empty rather than absent when
+  # every size has been zeroed. Zero its threads too, or it reserves a window to
+  # do nothing in.
+  fetch_loops_total=0
+  fetch_window=0
+  for upload_label in ${LADDER_SIZES}; do
+    eval "fetch_loops=\${FETCH_LOOPS_${upload_label}}"
+    eval "fetch_allowance=\${FETCH_SECONDS_PER_ITERATION_${upload_label}}"
+    fetch_loops_total=$((fetch_loops_total + fetch_loops))
+    fetch_window=$((fetch_window + fetch_loops * fetch_allowance))
+  done
+  if [ ${fetch_loops_total} -eq 0 ]; then
+    PHASE_USERS_fetchRamp=0
+  else
+    # Re-derived from the sizes that SURVIVED. The profile's window covers all
+    # four; if three of them have no prepared project, holding the full window
+    # would spend most of it doing nothing while every later phase waited.
+    PHASE_WINDOW_fetchRamp=${fetch_window}
+  fi
 }
 
 if [ ! -f "${SCENARIOFILE}" ]; then
@@ -470,36 +835,47 @@ add_prop createLargeMaxLatencyMs "${CREATE_LARGE_MAX_LATENCY_MS}"
 add_prop projectsCsv "${PROJECTS_CSV}"
 add_prop everydayPhaseDurationSeconds "${EVERYDAY_PHASE_DURATION_SECONDS}"
 add_prop probeDelaySeconds "${PROBE_DELAY_SECONDS}"
-add_prop probeDurationSeconds "${PROBE_DURATION_SECONDS}"
 add_prop probeThreads "${PROBE_THREADS}"
 add_prop probeThinkMs "${PROBE_THINK_MS}"
 add_prop probeMaxLatencyMs "${PROBE_MAX_LATENCY_MS}"
 add_prop validateBudgetMs "${VALIDATE_BUDGET_MS}"
-add_prop everydayBudgetMs "${EVERYDAY_BUDGET_MS}"
+add_prop normalBudgetMs "${NORMAL_BUDGET_MS}"
 add_prop validateResponseTimeoutMs "${VALIDATE_RESPONSE_TIMEOUT_MS}"
 add_prop sizeRampDelaySeconds "${SIZE_RAMP_DELAY_SECONDS}"
 add_prop sizeRampDurationSeconds "${SIZE_RAMP_DURATION_SECONDS}"
 add_prop sizeRampThreads "${SIZE_RAMP_THREADS}"
 add_prop sizeRampLoops "${SIZE_RAMP_LOOPS}"
-add_prop concStepDurationSeconds "${CONC_STEP_DURATION_SECONDS}"
-add_prop concDelay1 "${CONC_DELAY_1}"
-add_prop concDelay2 "${CONC_DELAY_2}"
-add_prop concDelay5 "${CONC_DELAY_5}"
-add_prop concDelay10 "${CONC_DELAY_10}"
-add_prop concDelay20 "${CONC_DELAY_20}"
 
-# The upload-journey staircase. uploaderUrl because the backend returns only
-# the upload PATH; uploadS3Bucket because /upload/initiate requires the caller
-# to name a bucket the environment's cdp-uploader may write to — the same
+# The upload journey. uploaderUrl because the backend returns only the upload
+# PATH; uploadS3Bucket because /upload/initiate requires the caller to name a
+# bucket the environment's cdp-uploader may write to — the same
 # UPLOAD_S3_BUCKET staging itself uses.
 add_prop uploaderUrl "${CDP_UPLOADER_URL}"
 add_prop uploadS3Bucket "${UPLOAD_S3_BUCKET}"
-add_prop journeyFile "${JOURNEY_FILE}"
 add_prop journeyBudgetMs "${JOURNEY_BUDGET_MS}"
-add_prop journeyStepDurationSeconds "${JOURNEY_STEP_DURATION_SECONDS}"
-add_prop journeyDelay1 "${JOURNEY_DELAY_1}"
-add_prop journeyDelay2 "${JOURNEY_DELAY_2}"
-add_prop journeyDelay5 "${JOURNEY_DELAY_5}"
+add_prop journeyLargeBudgetMs "${JOURNEY_LARGE_BUDGET_MS}"
+# The journey ladder runs per SIZE, so each one names its own fixture. An
+# operator override applies to one size rather than to "the journey file".
+for upload_label in ${LADDER_SIZES}; do
+  eval "journey_file=\${JOURNEY_FILE_$(printf '%s' "${upload_label}" | tr '[:lower:]' '[:upper:]')}"
+  add_prop "journeyFile_${upload_label}" "${journey_file}"
+done
+
+# The edit and fetch groups.
+add_prop editBudgetMs "${EDIT_BUDGET_MS}"
+add_prop editResponseTimeoutMs "${EDIT_RESPONSE_TIMEOUT_MS}"
+add_prop fetchBudgetMs "${FETCH_BUDGET_MS}"
+add_prop fetchResponseTimeoutMs "${FETCH_RESPONSE_TIMEOUT_MS}"
+add_prop initiateResponseTimeoutMs "${INITIATE_RESPONSE_TIMEOUT_MS}"
+add_prop uploadResponseTimeoutMs "${UPLOAD_RESPONSE_TIMEOUT_MS}"
+
+# The mixed workload's weights. Percent of iterations, so a slow endpoint does
+# not quietly become a smaller share of the load.
+add_prop mixListPercent "${MIX_LIST_PERCENT}"
+add_prop mixFetchPercent "${MIX_FETCH_PERCENT}"
+add_prop mixEditPercent "${MIX_EDIT_PERCENT}"
+add_prop mixValidatePercent "${MIX_VALIDATE_PERCENT}"
+add_prop mixThinkMs "${MIX_THINK_MS}"
 
 set -x
 if ! stage_uploads "${SERVICE_URL_SCHEME}://${BACKEND_DOMAIN}:${BACKEND_PORT}"; then
@@ -513,18 +889,68 @@ set +x
 # them earlier and overriding later would rely on JMeter's last-duplicate-wins
 # behaviour for repeated -J flags; this way each property is passed exactly once.
 disable_unstaged_phases
-add_prop sizeLoopsEveryday "${SIZE_LOOPS_EVERYDAY}"
+
+# Re-derive the timeline now that staging has decided what can actually run. A
+# phase zeroed above hands its window back rather than leaving dead air, so a
+# missing fixture shortens the run instead of padding it — and the probe, which
+# is derived from where the last phase ends, shortens with it.
+derive_ladder_delays
+add_prop probeDurationSeconds "${PROBE_DURATION_SECONDS}"
+
+add_prop sizeLoopsNormal "${SIZE_LOOPS_NORMAL}"
 add_prop sizeLoopsBusy "${SIZE_LOOPS_BUSY}"
 add_prop sizeLoopsLarge "${SIZE_LOOPS_LARGE}"
 add_prop sizeLoopsXlarge "${SIZE_LOOPS_XLARGE}"
-add_prop concUsers1 "${CONC_USERS_1}"
-add_prop concUsers2 "${CONC_USERS_2}"
-add_prop concUsers5 "${CONC_USERS_5}"
-add_prop concUsers10 "${CONC_USERS_10}"
-add_prop concUsers20 "${CONC_USERS_20}"
-add_prop journeyUsers1 "${JOURNEY_USERS_1}"
-add_prop journeyUsers2 "${JOURNEY_USERS_2}"
-add_prop journeyUsers5 "${JOURNEY_USERS_5}"
+
+# Every ladder phase, in one loop — the counterpart of the walk that derived
+# them. A zeroed step is still passed explicitly rather than left to the .jmx
+# default, because that default is the STANDARD profile and would otherwise run
+# a step the active profile deliberately left out.
+for phase_key in ${ALL_PHASE_KEYS}; do
+  eval "phase_users=\${PHASE_USERS_${phase_key}}"
+  eval "phase_window=\${PHASE_WINDOW_${phase_key}}"
+  eval "phase_delay=\${PHASE_DELAY_${phase_key}}"
+  # add_prop skips empty values so the .jmx default wins; a zero is a deliberate
+  # value here, so it is passed as the string it is.
+  SCENARIO_PROPS="${SCENARIO_PROPS} -Jusers_${phase_key}=${phase_users}"
+  SCENARIO_PROPS="${SCENARIO_PROPS} -Jwindow_${phase_key}=${phase_window}"
+  SCENARIO_PROPS="${SCENARIO_PROPS} -Jdelay_${phase_key}=${phase_delay}"
+done
+for upload_label in ${LADDER_SIZES}; do
+  eval "fetch_loops=\${FETCH_LOOPS_${upload_label}}"
+  SCENARIO_PROPS="${SCENARIO_PROPS} -JfetchLoops_${upload_label}=${fetch_loops}"
+done
+
+# ── The time budget, checked against the setup that actually happened ───────
+#
+# `standard` exists to be a run someone will sit and wait for, so it carries a
+# hard ceiling (PROFILE_BUDGET_SECONDS_*, enforced at design time by the test
+# suite against an ESTIMATED setup cost). This is the same check against the
+# measured one: the estimate cannot know how slow this environment's virus
+# scanner is today, and staging is most of the setup.
+#
+# It warns rather than fails, and says which knob to reach for. Failing here
+# would throw away a run that is already three-quarters set up, over a ceiling
+# that is a preference rather than a correctness property.
+SETUP_ELAPSED_SECONDS=$(( $(date +%s) - TASK_STARTED_AT ))
+eval "PROFILE_BUDGET_SECONDS=\${PROFILE_BUDGET_SECONDS_${PERF_PROFILE}:-0}"
+PROJECTED_TOTAL_SECONDS=$((SETUP_ELAPSED_SECONDS + RUN_END_SECONDS))
+set +x
+echo "▸ setup took ${SETUP_ELAPSED_SECONDS}s; the plan runs for ${RUN_END_SECONDS}s — projected total ${PROJECTED_TOTAL_SECONDS}s (~$((PROJECTED_TOTAL_SECONDS / 60)) min)"
+if [ "${PROFILE_BUDGET_SECONDS}" -gt 0 ] && [ ${PROJECTED_TOTAL_SECONDS} -gt "${PROFILE_BUDGET_SECONDS}" ]; then
+  SETUP_OVERRUN_SECONDS=0
+  if [ ${SETUP_ELAPSED_SECONDS} -gt "${SETUP_ALLOWANCE_SECONDS_DEFAULT}" ]; then
+    SETUP_OVERRUN_SECONDS=$((SETUP_ELAPSED_SECONDS - SETUP_ALLOWANCE_SECONDS_DEFAULT))
+  fi
+  echo "▸ WARNING: that is over the '${PERF_PROFILE}' profile's ${PROFILE_BUDGET_SECONDS}s budget by $((PROJECTED_TOTAL_SECONDS - PROFILE_BUDGET_SECONDS))s." >&2
+  if [ ${SETUP_OVERRUN_SECONDS} -gt 0 ]; then
+    echo "           Setup ran ${SETUP_OVERRUN_SECONDS}s past its ${SETUP_ALLOWANCE_SECONDS_DEFAULT}s allowance — usually a slow virus scan." >&2
+  else
+    echo "           Setup was within its allowance, so the plan itself is the overrun." >&2
+  fi
+  echo "           STAGE_UPLOADS=false skips staging entirely for a narrower run." >&2
+fi
+set -x
 
 REPORTFILE=${NOW}-perftest-${SCENARIO}-report.csv
 LOGFILE=${JM_LOGS}/perftest-${SCENARIO}.log
@@ -552,7 +978,7 @@ set -x
 # an absent row.
 if [ -f "${REPORTFILE}" ]; then
   set +x
-  SIZE_RAMP_EXPECTED="everyday:$(( SIZE_LOOPS_EVERYDAY * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
+  SIZE_RAMP_EXPECTED="normal:$(( SIZE_LOOPS_NORMAL * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
   SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},busy:$(( SIZE_LOOPS_BUSY * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
   SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},large:$(( SIZE_LOOPS_LARGE * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
   SIZE_RAMP_EXPECTED="${SIZE_RAMP_EXPECTED},xlarge:$(( SIZE_LOOPS_XLARGE * SIZE_RAMP_LOOPS * SIZE_RAMP_THREADS ))"
@@ -595,6 +1021,10 @@ set +x
 echo "──────────────────────────── bng-perf-tests summary ───────────────────────────────"
 echo "  run_id: ${RUN_ID:-<unset>} (environment ${ENVIRONMENT:-<unset>})"
 echo "  ${SCENARIO}: RAN — report published to ${RESULTS_OUTPUT_S3_PATH}"
+echo "  profile ${PERF_PROFILE}: ${SETUP_ELAPSED_SECONDS}s setup + ${RUN_END_SECONDS}s plan = $(( $(date +%s) - TASK_STARTED_AT ))s total (~$(( ($(date +%s) - TASK_STARTED_AT) / 60 )) min)"
+echo "  Setup is the half the plan's own timeline does not include. If it is well"
+echo "  under ${SETUP_ALLOWANCE_SECONDS_DEFAULT}s here, SETUP_ALLOWANCE_SECONDS in scenarios/ladders.config.mjs"
+echo "  can come down and the ladders can have the difference."
 echo "  NOTE: red assertions in the report (project-list by design until the BMD-933 backend"
 echo "        fix lands, or a slow/down frontend on the home-page group) do NOT gate the run."
 echo "────────────────────────────────────────────────────────────────────────────────────"

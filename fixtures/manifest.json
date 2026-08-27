@@ -1,9 +1,9 @@
 {
   "sizes": [
     {
-      "label": "everyday",
+      "label": "normal",
       "parcels": 80,
-      "file": "baseline-everyday.gpkg",
+      "file": "baseline-normal.gpkg",
       "bytes": 143360
     },
     {
